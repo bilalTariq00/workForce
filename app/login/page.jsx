@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Eye, EyeOff, Info, Copy, Check } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +12,25 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [copied, setCopied] = useState({ email: false, password: false });
+
+  const defaultHREmail = 'hr@workforce.com';
+  const defaultHRPassword = 'Admin@123';
+
+  const handleCopy = (text, type) => {
+    navigator.clipboard.writeText(text);
+    setCopied({ ...copied, [type]: true });
+    setTimeout(() => {
+      setCopied({ ...copied, [type]: false });
+    }, 2000);
+  };
+
+  const handleFillCredentials = () => {
+    setEmail(defaultHREmail);
+    setPassword(defaultHRPassword);
+    setShowCredentials(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,6 +77,83 @@ export default function LoginPage() {
             <p className="text-gray-600 text-sm md:text-base">
               Sign in to your account
             </p>
+          </div>
+
+          {/* HR Credentials Info */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => setShowCredentials(!showCredentials)}
+              className="w-full flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">
+                  Default HR Credentials
+                </span>
+              </div>
+              <span className="text-xs text-blue-600">
+                {showCredentials ? 'Hide' : 'Show'}
+              </span>
+            </button>
+
+            {showCredentials && (
+              <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-blue-900 mb-1">
+                    Email
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-3 py-2 bg-white border border-blue-200 rounded text-sm text-gray-800 font-mono">
+                      {defaultHREmail}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(defaultHREmail, 'email')}
+                      className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                      title="Copy email"
+                    >
+                      {copied.email ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-blue-900 mb-1">
+                    Password
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-3 py-2 bg-white border border-blue-200 rounded text-sm text-gray-800 font-mono">
+                      {defaultHRPassword}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(defaultHRPassword, 'password')}
+                      className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                      title="Copy password"
+                    >
+                      {copied.password ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleFillCredentials}
+                  className="w-full mt-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Fill Credentials
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Login Form */}
