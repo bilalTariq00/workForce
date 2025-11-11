@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 // Check if user has marked attendance today
 export async function GET() {
   try {

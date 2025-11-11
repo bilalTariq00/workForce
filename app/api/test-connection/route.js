@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db/mongodb';
 import { Employee } from '@/lib/models/Employee';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 // Test endpoint to check MongoDB connection
 export async function GET() {
   try {
