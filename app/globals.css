@@ -83,13 +83,13 @@ input::placeholder, textarea::placeholder {
     --chart-4: 25 70% 60%;
     --chart-5: 25 45% 45%;
     --radius: 0.5rem;
-    --sidebar-background: 25 20% 98%;
-    --sidebar-foreground: 25 15% 20%;
+    --sidebar-background: 25 50% 35%;
+    --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 25 50% 35%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 25 25% 94%;
+    --sidebar-accent: 0 0% 100%;
     --sidebar-accent-foreground: 25 50% 35%;
-    --sidebar-border: 25 15% 90%;
+    --sidebar-border: 25 45% 30%;
     --sidebar-ring: 25 50% 35%;
   }
   .dark {

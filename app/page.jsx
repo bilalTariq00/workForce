@@ -16,7 +16,12 @@ export default async function Home() {
     redirect('/hr/dashboard');
   }
 
-  // For other roles, check if attendance is marked today
+  // Site Managers go directly to their dashboard (they don't need to mark attendance)
+  if (session.user.role === 'site_manager') {
+    redirect('/site-manager/dashboard');
+  }
+
+  // For other roles (labour, etc.), check if attendance is marked today
   await connectDB();
   
   const today = new Date();

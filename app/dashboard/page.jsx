@@ -18,6 +18,11 @@ export default async function Dashboard() {
     redirect('/hr/dashboard');
   }
 
+  // Redirect Site Managers to their dashboard
+  if (session.user.role === 'site_manager') {
+    redirect('/site-manager/dashboard');
+  }
+
   // Check if attendance is marked today
   await connectDB();
   

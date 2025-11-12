@@ -18,7 +18,7 @@ const createSiteSchema = z.object({
     longitude: z.number().min(-180).max(180),
   }),
   attendanceRadius: z.number().min(10).max(1000).default(100),
-  contractsManagerId: z.string(),
+  contractsManagerId: z.string().optional(), // Made optional - can be Site Manager or Contracts Manager
   status: z.enum(['planning', 'active', 'completed', 'on_hold']).default('active'),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -100,12 +100,28 @@ export async function POST(req) {
     }
 
     // Create site
+    // Note: contractsManagerId field is being used to store Site Manager ID
     const site = await Site.create({
       ...validatedData,
       siteCode,
+      contractsManagerId: validatedData.contractsManagerId || undefined, // Optional
       startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
       endDate: validatedData.endDate ? new Date(validatedData.endDate) : undefined,
     });
+
+    // If a Site Manager was selected, automatically assign them to this site
+    // This sets the Site Manager's siteId field so they can access the site in their dashboard
+    if (validatedData.contractsManagerId) {
+      const { Employee } = await import('@/lib/models/Employee');
+      const siteManager = await Employee.findById(validatedData.contractsManagerId);
+      
+      if (siteManager && siteManager.role === 'site_manager') {
+        // Assign the Site Manager to this site
+        siteManager.siteId = site._id;
+        await siteManager.save();
+        console.log(`Site Manager ${siteManager.firstName} ${siteManager.lastName} assigned to site ${site.name}`);
+      }
+    }
 
     const siteResponse = await Site.findById(site._id)
       .populate('contractsManagerId', 'firstName lastName email')

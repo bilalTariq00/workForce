@@ -66,6 +66,7 @@ const updateEmployeeSchema = z.object({
   role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']).optional(),
   payRate: z.number().min(0).optional(),
   status: z.enum(['active', 'inactive', 'terminated']).optional(),
+  siteId: z.string().nullable().optional(), // Allow assigning/unassigning site
   bankDetails: z.object({
     accountNumber: z.string().optional(),
     sortCode: z.string().optional(),
@@ -135,6 +136,24 @@ export async function PATCH(req, { params }) {
     // Hash password if provided
     if (validatedData.password) {
       validatedData.password = await bcrypt.hash(validatedData.password, 10);
+    }
+
+    // Handle siteId assignment/unassignment
+    // If siteId is null or empty string, unassign from site
+    if (validatedData.siteId !== undefined) {
+      if (validatedData.siteId === null || validatedData.siteId === '') {
+        validatedData.siteId = null; // Unassign from site
+      } else {
+        // Validate that the site exists
+        const { Site } = await import('@/lib/models/Site');
+        const site = await Site.findById(validatedData.siteId);
+        if (!site) {
+          return NextResponse.json(
+            { success: false, error: { code: 'INVALID_SITE', message: 'Site not found' } },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Update employee
