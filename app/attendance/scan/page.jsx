@@ -22,6 +22,9 @@ export default function AttendanceScanPage() {
   const [manualQR, setManualQR] = useState('');
   const [location, setLocation] = useState(null);
   const [locationError, setLocationError] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [nearestSite, setNearestSite] = useState(null);
+  const [distanceToSite, setDistanceToSite] = useState(null);
   const [checkingAttendance, setCheckingAttendance] = useState(true);
   const [alreadyMarked, setAlreadyMarked] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -56,41 +59,154 @@ export default function AttendanceScanPage() {
     }
   }, [status, router]);
 
-  // Get user location
-  useEffect(() => {
-    if (navigator.geolocation) {
+  // Function to get user location
+  const getCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser.'));
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
+          const loc = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-          });
+          };
+          resolve(loc);
         },
         (err) => {
-          setLocationError('Location access denied. Please enable location services.');
-          console.error('Geolocation error:', err);
+          reject(err);
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000,
           maximumAge: 0,
         }
       );
-    } else {
-      setLocationError('Geolocation is not supported by your browser.');
+    });
+  };
+
+  // Function to check distance to nearest site
+  const checkDistanceToSite = async (userLocation) => {
+    try {
+      const response = await fetch('/api/v1/sites');
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const activeSites = result.data.filter(site => site.status === 'active');
+        
+        if (activeSites.length === 0) {
+          return null;
+        }
+
+        // Calculate distance to each site
+        let nearest = null;
+        let minDistance = Infinity;
+
+        for (const site of activeSites) {
+          if (!site.location || !site.location.latitude || !site.location.longitude) {
+            continue;
+          }
+
+          const distance = calculateDistance(
+            site.location.latitude,
+            site.location.longitude,
+            userLocation.latitude,
+            userLocation.longitude
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearest = { ...site, distance: Math.round(distance) };
+          }
+        }
+
+        return nearest;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error checking site distance:', err);
+      return null;
     }
+  };
+
+  // Calculate distance using Haversine formula
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+  };
+
+  // Refresh location
+  const refreshLocation = async () => {
+    setLocationLoading(true);
+    setLocationError('');
+    try {
+      const loc = await getCurrentLocation();
+      setLocation(loc);
+      
+      // Check distance to nearest site
+      const nearest = await checkDistanceToSite(loc);
+      if (nearest) {
+        setNearestSite(nearest);
+        setDistanceToSite(nearest.distance);
+      }
+    } catch (err) {
+      let errorMsg = 'Failed to get location. ';
+      if (err.code === 1) {
+        errorMsg += 'Please allow location access in your browser settings.';
+      } else if (err.code === 2) {
+        errorMsg += 'Location unavailable. Please check your GPS.';
+      } else if (err.code === 3) {
+        errorMsg += 'Location request timed out. Please try again.';
+      } else {
+        errorMsg += err.message || 'Unknown error.';
+      }
+      setLocationError(errorMsg);
+      console.error('Geolocation error:', err);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  // Get user location on mount
+  useEffect(() => {
+    refreshLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleQRScan = async (qrData) => {
-    if (!location) {
-      setError('Please allow location access to mark attendance.');
-      return;
-    }
-
     setError('');
     setLoading(true);
 
     try {
+      // Refresh location right before scanning for accuracy
+      let currentLocation = location;
+      if (!currentLocation) {
+        setError('Getting your location...');
+        currentLocation = await getCurrentLocation();
+        setLocation(currentLocation);
+      } else {
+        // Still refresh to get most accurate location
+        try {
+          currentLocation = await getCurrentLocation();
+          setLocation(currentLocation);
+        } catch (err) {
+          // Use existing location if refresh fails
+          console.warn('Could not refresh location, using existing:', err);
+        }
+      }
+
       const response = await fetch('/api/v1/attendance/mark', {
         method: 'POST',
         headers: {
@@ -98,8 +214,8 @@ export default function AttendanceScanPage() {
         },
         body: JSON.stringify({
           qrCode: qrData,
-          latitude: location.latitude,
-          longitude: location.longitude,
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
         }),
       });
 
@@ -112,10 +228,22 @@ export default function AttendanceScanPage() {
           router.refresh();
         }, 2000);
       } else {
-        setError(result.error?.message || 'Failed to mark attendance');
+        // Show detailed error message
+        if (result.error?.code === 'OUT_OF_RANGE') {
+          setError(
+            `You are ${result.error.distance}m away from the site. ` +
+            `Please move within ${result.error.requiredRadius}m of the site to mark attendance.`
+          );
+        } else {
+          setError(result.error?.message || 'Failed to mark attendance');
+        }
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      if (err.message?.includes('Geolocation')) {
+        setError('Location access denied. Please allow location access to mark attendance.');
+      } else {
+        setError('An error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -377,17 +505,70 @@ export default function AttendanceScanPage() {
 
           <CardContent className="space-y-6">
             {/* Location Status */}
-            {location ? (
-              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
-                <MapPin className="h-4 w-4" />
-                <span>Location detected</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                <AlertCircle className="h-4 w-4" />
-                <span>{locationError || 'Requesting location...'}</span>
-              </div>
-            )}
+            <div className="space-y-2">
+              {location ? (
+                <div className="flex items-center justify-between text-sm bg-green-50 p-3 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <MapPin className="h-4 w-4" />
+                    <span>Location detected</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={refreshLocation}
+                    disabled={locationLoading}
+                    className="h-7 text-xs"
+                  >
+                    {locationLoading ? 'Refreshing...' : 'Refresh'}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-sm bg-amber-50 p-3 rounded-lg">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{locationError || 'Requesting location...'}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={refreshLocation}
+                    disabled={locationLoading}
+                    className="h-7 text-xs"
+                  >
+                    {locationLoading ? 'Loading...' : 'Retry'}
+                  </Button>
+                </div>
+              )}
+
+              {/* Show distance to nearest site */}
+              {nearestSite && (
+                <div className={`text-sm p-3 rounded-lg ${
+                  distanceToSite <= nearestSite.attendanceRadius
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-red-50 text-red-700'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span>
+                      <strong>{nearestSite.name}</strong>
+                    </span>
+                    <span>
+                      {distanceToSite}m away
+                    </span>
+                  </div>
+                  <div className="text-xs mt-1">
+                    {distanceToSite <= nearestSite.attendanceRadius ? (
+                      <span className="text-green-600">✓ Within range ({nearestSite.attendanceRadius}m radius)</span>
+                    ) : (
+                      <span className="text-red-600">
+                        ⚠ Too far! Need to be within {nearestSite.attendanceRadius}m
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Error Message */}
             {error && (
