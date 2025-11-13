@@ -42,9 +42,19 @@ export default function AttendanceScanPage() {
 
         if (result.success && result.data.marked) {
           setAlreadyMarked(true);
-          // Redirect to dashboard after 2 seconds
+          // Redirect to role-specific dashboard after 2 seconds
           setTimeout(() => {
-            router.push('/dashboard');
+            const userRole = session?.user?.role;
+            if (userRole === 'hr_officer' || userRole === 'admin') {
+              router.push('/hr/dashboard');
+            } else if (userRole === 'site_manager') {
+              router.push('/site-manager/dashboard');
+            } else if (userRole === 'contracts_manager') {
+              router.push('/contracts-manager/dashboard');
+            } else {
+              router.push('/dashboard');
+            }
+            router.refresh();
           }, 2000);
         }
       } catch (err) {
@@ -224,7 +234,18 @@ export default function AttendanceScanPage() {
       if (result.success) {
         setSuccess(true);
         setTimeout(() => {
-          router.push('/dashboard');
+          // Redirect to role-specific dashboard
+          const userRole = session?.user?.role;
+          if (userRole === 'hr_officer' || userRole === 'admin') {
+            router.push('/hr/dashboard');
+          } else if (userRole === 'site_manager') {
+            router.push('/site-manager/dashboard');
+          } else if (userRole === 'contracts_manager') {
+            router.push('/contracts-manager/dashboard');
+          } else {
+            // For labour and other roles, go to personal dashboard
+            router.push('/dashboard');
+          }
           router.refresh();
         }, 2000);
       } else {
