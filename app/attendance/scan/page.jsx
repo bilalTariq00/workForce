@@ -154,9 +154,35 @@ export default function AttendanceScanPage() {
         throw new Error('Camera API not supported. Please use a modern browser or manual entry.');
       }
 
+      // Wait for DOM element to be ready
+      await new Promise((resolve) => {
+        const checkElement = () => {
+          const element = document.getElementById(qrCodeRegionId);
+          if (element) {
+            resolve();
+          } else {
+            setTimeout(checkElement, 50);
+          }
+        };
+        checkElement();
+      });
+
+      // Small delay to ensure DOM is fully rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Dynamic import
       const { Html5Qrcode } = await import('html5-qrcode');
       
+      // Clean up any existing scanner instance
+      if (scannerRef.current) {
+        try {
+          await scannerRef.current.stop();
+          scannerRef.current.clear();
+        } catch (e) {
+          console.warn('Error cleaning up previous scanner:', e);
+        }
+      }
+
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
 
@@ -187,8 +213,8 @@ export default function AttendanceScanPage() {
         {
           fps: 10,
           qrbox: function(viewfinderWidth, viewfinderHeight) {
-            // Make QR box responsive - 80% of the smaller dimension
-            const minEdgePercentage = 0.8;
+            // Make QR box responsive - 70% of the smaller dimension for better detection
+            const minEdgePercentage = 0.7;
             const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
             const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
             return {
@@ -207,12 +233,7 @@ export default function AttendanceScanPage() {
         },
         (errorMessage) => {
           // Ignore scanning errors (they're frequent during scanning)
-          // Only log if it's not a common scanning error
-          if (!errorMessage.includes('NotFoundException') && 
-              !errorMessage.includes('No QR code') &&
-              !errorMessage.includes('QR code parse error')) {
-            // Silent - these are normal during scanning
-          }
+          // These are normal and expected while scanning
         }
       );
 
@@ -238,22 +259,54 @@ export default function AttendanceScanPage() {
       
       setError(errorMsg);
       setShowScanner(false);
+      
+      // Clean up on error
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.clear();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     }
   };
 
-  const stopQRScanner = () => {
+  const stopQRScanner = async () => {
     if (scannerRef.current) {
-      scannerRef.current
-        .stop()
-        .then(() => {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+        scannerRef.current = null;
+        setShowScanner(false);
+        setCameraLoading(false);
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+        // Force cleanup even if stop fails
+        try {
           scannerRef.current.clear();
-          setShowScanner(false);
-        })
-        .catch((err) => {
-          console.error('Error stopping scanner:', err);
-        });
+        } catch (e) {
+          // Ignore
+        }
+        scannerRef.current = null;
+        setShowScanner(false);
+        setCameraLoading(false);
+      }
+    } else {
+      setShowScanner(false);
+      setCameraLoading(false);
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    };
+  }, []);
 
   // Redirect HR/Admin users - they don't need to mark attendance
   useEffect(() => {
@@ -464,10 +517,17 @@ export default function AttendanceScanPage() {
                     </div>
                   ) : (
                     <>
-                      <div id={qrCodeRegionId} className="w-full rounded-lg overflow-hidden bg-black min-h-[300px]"></div>
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground mb-2">
+                      <div 
+                        id={qrCodeRegionId} 
+                        className="w-full rounded-lg overflow-hidden bg-black"
+                        style={{ minHeight: '300px', position: 'relative' }}
+                      ></div>
+                      <div className="text-center space-y-2">
+                        <p className="text-xs text-muted-foreground">
                           Point your camera at the QR code
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          The camera view should appear above
                         </p>
                       </div>
                     </>
