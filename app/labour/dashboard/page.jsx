@@ -66,9 +66,15 @@ export default async function LabourDashboard() {
     .limit(7)
     .lean();
 
+  // Serialize all Mongoose objects
   const serializedEmployee = serializeMongoose(employee);
   const serializedAttendance = attendance ? serializeMongoose(attendance) : null;
   const serializedRecentAttendance = recentAttendance.map(a => serializeMongoose(a));
+
+  // Extract site info for easier access
+  const siteName = serializedEmployee.siteId?.name || null;
+  const siteCode = serializedEmployee.siteId?.siteCode || null;
+  const siteAddress = serializedEmployee.siteId?.address || null;
 
   return (
     <LabourLayout>
@@ -76,10 +82,10 @@ export default async function LabourDashboard() {
         {/* Welcome Section */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-            Welcome, {employee.firstName}!
+            Welcome, {serializedEmployee.firstName}!
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Employee ID: {employee.employeeId} | {employee.siteId ? `Site: ${employee.siteId.name}` : 'No site assigned'}
+            Employee ID: {serializedEmployee.employeeId} | {siteName ? `Site: ${siteName}` : 'No site assigned'}
           </p>
         </div>
 
@@ -93,7 +99,7 @@ export default async function LabourDashboard() {
             <CardDescription>Your attendance status for today</CardDescription>
           </CardHeader>
           <CardContent>
-            {attendance ? (
+            {serializedAttendance ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle2 className="h-5 w-5" />
@@ -102,25 +108,25 @@ export default async function LabourDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Site</p>
-                    <p className="font-medium">{attendance.siteId?.name || 'N/A'}</p>
+                    <p className="font-medium">{serializedAttendance.siteId?.name || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Sign In Time</p>
                     <p className="font-medium">
-                      {new Date(attendance.signInTime).toLocaleTimeString()}
+                      {new Date(serializedAttendance.signInTime).toLocaleTimeString()}
                     </p>
                   </div>
-                  {attendance.signOutTime && (
+                  {serializedAttendance.signOutTime && (
                     <div>
                       <p className="text-sm text-muted-foreground">Sign Out Time</p>
                       <p className="font-medium">
-                        {new Date(attendance.signOutTime).toLocaleTimeString()}
+                        {new Date(serializedAttendance.signOutTime).toLocaleTimeString()}
                       </p>
                     </div>
                   )}
                   <div>
                     <p className="text-sm text-muted-foreground">Status</p>
-                    <p className="font-medium capitalize">{attendance.status}</p>
+                    <p className="font-medium capitalize">{serializedAttendance.status}</p>
                   </div>
                 </div>
               </div>
@@ -148,7 +154,7 @@ export default async function LabourDashboard() {
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Annual Leave Balance: <span className="font-semibold">{employee.annualLeaveBalance || 0} days</span>
+                  Annual Leave Balance: <span className="font-semibold">{serializedEmployee.annualLeaveBalance || 0} days</span>
                 </p>
                 <Link href="/attendance/leave-request">
                   <Button className="w-full">Request Leave</Button>
@@ -166,15 +172,19 @@ export default async function LabourDashboard() {
               <CardDescription>Your assigned site details</CardDescription>
             </CardHeader>
             <CardContent>
-              {employee.siteId ? (
+              {siteName ? (
                 <div className="space-y-2">
-                  <p className="font-medium">{employee.siteId.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {employee.siteId.address?.street}, {employee.siteId.address?.city}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Code: {employee.siteId.siteCode}
-                  </p>
+                  <p className="font-medium">{siteName}</p>
+                  {siteAddress && (
+                    <p className="text-sm text-muted-foreground">
+                      {siteAddress.street}, {siteAddress.city}
+                    </p>
+                  )}
+                  {siteCode && (
+                    <p className="text-sm text-muted-foreground">
+                      Code: {siteCode}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No site assigned</p>
@@ -209,7 +219,7 @@ export default async function LabourDashboard() {
                         })}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {att.siteId?.name || 'N/A'} • {new Date(att.signInTime).toLocaleTimeString()}
+                        {att.siteId?.name || 'N/A'} • {att.signInTime ? new Date(att.signInTime).toLocaleTimeString() : 'N/A'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
