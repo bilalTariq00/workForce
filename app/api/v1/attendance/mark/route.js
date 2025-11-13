@@ -97,6 +97,27 @@ export async function POST(req) {
       );
     }
 
+    // Validate site location
+    if (!nearestSite.location || 
+        nearestSite.location.latitude == null || 
+        nearestSite.location.longitude == null) {
+      console.error('Nearest site has invalid location:', {
+        siteId: nearestSite._id,
+        siteName: nearestSite.name,
+        location: nearestSite.location
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_SITE_LOCATION',
+            message: 'Site location is not configured correctly. Please contact HR to update the site location.',
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     // Check if within radius
     const radiusCheck = isWithinRadius(
       nearestSite.location,
@@ -104,15 +125,45 @@ export async function POST(req) {
       nearestSite.attendanceRadius
     );
 
+    // If distance is unreasonably large, it's likely a data issue
+    if (radiusCheck.distance > 1000000) { // More than 1000 km
+      console.error('Unreasonably large distance detected:', {
+        siteId: nearestSite._id,
+        siteName: nearestSite.name,
+        siteLocation: nearestSite.location,
+        userLocation: userLocation,
+        distance: radiusCheck.distance,
+        distanceKm: (radiusCheck.distance / 1000).toFixed(2)
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_SITE_LOCATION',
+            message: 'Site location appears to be incorrect. Please contact HR to verify and update the site location coordinates.',
+            distance: radiusCheck.distance,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     if (!radiusCheck.isWithinRadius) {
+      // Format distance nicely
+      let distanceDisplay = `${radiusCheck.distance}m`;
+      if (radiusCheck.distance >= 1000) {
+        distanceDisplay = `${(radiusCheck.distance / 1000).toFixed(1)}km`;
+      }
+
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'OUT_OF_RANGE',
-            message: `You are ${radiusCheck.distance}m away from the site. Please be within ${nearestSite.attendanceRadius}m to mark attendance.`,
+            message: `You are ${distanceDisplay} away from ${nearestSite.name}. Please be within ${nearestSite.attendanceRadius}m of the site to mark attendance.`,
             distance: radiusCheck.distance,
             requiredRadius: nearestSite.attendanceRadius,
+            siteName: nearestSite.name,
           },
         },
         { status: 400 }
