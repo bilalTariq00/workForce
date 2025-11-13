@@ -186,10 +186,41 @@ export default function AttendanceScanPage() {
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
 
-      // Try to get available cameras - this will also request permission
+      // Request camera permission explicitly first with timeout
+      console.log('Requesting camera permission...');
+      let permissionGranted = false;
+      try {
+        const permissionPromise = navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Permission request timeout')), 10000)
+        );
+
+        const stream = await Promise.race([permissionPromise, timeoutPromise]);
+        stream.getTracks().forEach(track => track.stop()); // Stop test stream
+        permissionGranted = true;
+        console.log('Camera permission granted');
+      } catch (permErr) {
+        console.error('Permission error:', permErr);
+        if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
+          throw new Error('Camera permission denied. Please allow camera access in your browser settings.');
+        } else if (permErr.message === 'Permission request timeout') {
+          throw new Error('Camera permission request timed out. Please try again or use manual entry.');
+        }
+        // Continue anyway - some browsers grant permission during getCameras()
+      }
+
+      // Try to get available cameras with timeout
       let cameraId = null;
       try {
-        const devices = await Html5Qrcode.getCameras();
+        const camerasPromise = Html5Qrcode.getCameras();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Camera enumeration timeout')), 5000)
+        );
+
+        const devices = await Promise.race([camerasPromise, timeoutPromise]);
         console.log('Available cameras:', devices);
         if (devices && devices.length > 0) {
           // Prefer back camera (environment) on mobile
@@ -202,13 +233,17 @@ export default function AttendanceScanPage() {
         }
       } catch (camErr) {
         console.warn('Could not enumerate cameras, will use facingMode:', camErr);
+        if (camErr.message === 'Camera enumeration timeout') {
+          console.warn('Camera enumeration timed out, using default facingMode');
+        }
       }
 
       // Use camera ID if found, otherwise use facingMode
       const cameraConfig = cameraId || { facingMode: 'environment' };
       console.log('Starting QR scanner with:', cameraConfig);
 
-      await html5QrCode.start(
+      // Start scanner with timeout
+      const startPromise = html5QrCode.start(
         cameraConfig,
         {
           fps: 10,
@@ -237,6 +272,12 @@ export default function AttendanceScanPage() {
         }
       );
 
+      const startTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Camera start timeout')), 15000)
+      );
+
+      await Promise.race([startPromise, startTimeoutPromise]);
+
       setCameraLoading(false);
       console.log('Camera started successfully');
     } catch (err) {
@@ -251,6 +292,8 @@ export default function AttendanceScanPage() {
         errorMsg += 'No camera found. Please use manual entry below.';
       } else if (err.message?.includes('HTTPS') || err.message?.includes('secure context')) {
         errorMsg += 'Camera requires HTTPS connection. Please use manual entry below.';
+      } else if (err.message?.includes('timeout')) {
+        errorMsg += 'Camera initialization timed out. Please try again or use manual entry below.';
       } else if (err.message?.includes('not supported')) {
         errorMsg += err.message;
       } else {
