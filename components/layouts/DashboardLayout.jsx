@@ -15,6 +15,8 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Calendar,
+  DollarSign,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -52,6 +54,16 @@ export default function DashboardLayout({ children }) {
       title: 'Timesheets',
       icon: Clock,
       href: '/hr/timesheets',
+    },
+    {
+      title: 'Leave Requests',
+      icon: Calendar,
+      href: '/hr/leave-requests',
+    },
+    {
+      title: 'Payroll',
+      icon: DollarSign,
+      href: '/hr/payroll',
     },
     {
       title: 'Reports',

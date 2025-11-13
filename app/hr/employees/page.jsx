@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { UserPlus } from 'lucide-react';
 import Link from 'next/link';
+import { serializeMongooseArray } from '@/lib/utils/serialize';
 
 export default async function EmployeesPage() {
   const session = await getServerSession(authOptions);
@@ -55,7 +56,7 @@ export default async function EmployeesPage() {
             <CardTitle>All Employees ({employees.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <EmployeeList initialEmployees={employees} />
+            <EmployeeList initialEmployees={serializeMongooseArray(employees)} />
           </CardContent>
         </Card>
       </div>

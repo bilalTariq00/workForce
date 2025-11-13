@@ -1,0 +1,159 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/config';
+import { connectDB } from '@/lib/db/mongodb';
+import { LeaveRequest } from '@/lib/models/LeaveRequest';
+import mongoose from 'mongoose';
+import { z } from 'zod';
+
+const approveLeaveRequestSchema = z.object({
+  action: z.enum(['approve', 'reject']),
+  rejectionReason: z.string().max(500).optional(),
+});
+
+/**
+ * POST /api/v1/leave-requests/[id]/approve
+ * 
+ * Approve or reject a leave request
+ * 
+ * Access: HR Officers, Admin, and Supervisors
+ * 
+ * Business Rules:
+ * - Can only approve/reject pending requests
+ * - Approval checks for overlapping leave
+ * - Approval deducts from annual leave balance (if annual leave)
+ */
+export async function POST(req, { params }) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
+        { status: 401 }
+      );
+    }
+
+    // Only HR, Admin, and Contracts Managers can approve leave
+    if (
+      session.user.role !== 'hr_officer' &&
+      session.user.role !== 'admin' &&
+      session.user.role !== 'contracts_manager'
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Only HR Officers, Admin, and Contracts Managers can approve leave requests',
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const validatedData = approveLeaveRequestSchema.parse(body);
+
+    await connectDB();
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_ID',
+            message: 'Invalid leave request ID',
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const leaveRequest = await LeaveRequest.findById(params.id);
+
+    if (!leaveRequest) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Leave request not found',
+          },
+        },
+        { status: 404 }
+      );
+    }
+
+    if (leaveRequest.status !== 'pending') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_STATUS',
+            message: `Leave request is already ${leaveRequest.status}`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (validatedData.action === 'approve') {
+      try {
+        await leaveRequest.approve(session.user.id);
+      } catch (error) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'APPROVAL_ERROR',
+              message: error.message,
+            },
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Reject
+      await leaveRequest.reject(session.user.id, validatedData.rejectionReason);
+    }
+
+    const populated = await LeaveRequest.findById(leaveRequest._id)
+      .populate('employeeId', 'firstName lastName email employeeId')
+      .populate('approvedBy', 'firstName lastName email')
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      message: `Leave request ${validatedData.action}d successfully`,
+      data: populated,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid request data',
+            details: error.errors,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error('Error approving/rejecting leave request:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'An error occurred',
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
+

@@ -14,6 +14,8 @@ const createEmployeeSchema = z.object({
   password: z.string().min(6),
   role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']),
   payRate: z.number().min(0).optional(),
+  siteId: z.string().nullable().optional(), // Allow assigning to site
+  annualLeaveBalance: z.number().min(0).optional(), // Annual leave balance in days
   bankDetails: z.object({
     accountNumber: z.string().optional(),
     sortCode: z.string().optional(),
@@ -117,6 +119,18 @@ export async function POST(req) {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+
+    // Validate siteId if provided
+    if (validatedData.siteId) {
+      const { Site } = await import('@/lib/models/Site');
+      const site = await Site.findById(validatedData.siteId);
+      if (!site) {
+        return NextResponse.json(
+          { success: false, error: { code: 'INVALID_SITE', message: 'Site not found' } },
+          { status: 400 }
+        );
+      }
+    }
 
     // Create employee
     const employee = await Employee.create({

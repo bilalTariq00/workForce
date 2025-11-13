@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserPlus } from 'lucide-react';
 import Link from 'next/link';
+import { serializeMongooseArray } from '@/lib/utils/serialize';
 
 export default async function HRDashboard() {
   const session = await getServerSession(authOptions);
@@ -65,7 +66,7 @@ export default async function HRDashboard() {
             <CardTitle>All Employees</CardTitle>
           </CardHeader>
           <CardContent>
-            <EmployeeList initialEmployees={employees} />
+            <EmployeeList initialEmployees={serializeMongooseArray(employees)} />
           </CardContent>
         </Card>
       </div>

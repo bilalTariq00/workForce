@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2 } from 'lucide-react';
 import Link from 'next/link';
+import { serializeMongoose } from '@/lib/utils/serialize';
 
 /**
  * Site Manager Dashboard Page
@@ -163,16 +164,16 @@ export default async function SiteManagerDashboard() {
           // Show form if draft, view if locked/sent
           isDraft ? (
             <DailyLogForm
-              initialData={todayLog}
-              siteId={siteManager.siteId}
+              initialData={todayLog ? serializeMongoose(todayLog) : null}
+              siteId={siteManager.siteId?.toString()}
               siteName={site.name}
             />
           ) : (
-            <DailyLogView dailyLog={todayLog} />
+            <DailyLogView dailyLog={todayLog ? serializeMongoose(todayLog) : null} />
           )
         ) : (
           // Show create form if no log exists
-          <DailyLogForm siteId={siteManager.siteId} siteName={site.name} />
+          <DailyLogForm siteId={siteManager.siteId?.toString()} siteName={site.name} />
         )}
       </div>
     </SiteManagerLayout>

@@ -21,6 +21,11 @@ export default async function Home() {
     redirect('/site-manager/dashboard');
   }
 
+  // Contracts Managers go directly to their dashboard
+  if (session.user.role === 'contracts_manager') {
+    redirect('/contracts-manager/dashboard');
+  }
+
   // For other roles (labour, etc.), check if attendance is marked today
   await connectDB();
   

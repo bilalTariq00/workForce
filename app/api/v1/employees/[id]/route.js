@@ -67,6 +67,7 @@ const updateEmployeeSchema = z.object({
   payRate: z.number().min(0).optional(),
   status: z.enum(['active', 'inactive', 'terminated']).optional(),
   siteId: z.string().nullable().optional(), // Allow assigning/unassigning site
+  annualLeaveBalance: z.number().min(0).optional(), // Annual leave balance in days
   bankDetails: z.object({
     accountNumber: z.string().optional(),
     sortCode: z.string().optional(),

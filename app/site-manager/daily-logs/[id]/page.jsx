@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { serializeMongoose } from '@/lib/utils/serialize';
 
 /**
  * Site Manager Daily Log Detail Page
@@ -144,7 +145,7 @@ export default async function DailyLogDetailPage({ params }) {
         )}
 
         {/* Log View */}
-        <DailyLogView dailyLog={log} />
+        <DailyLogView dailyLog={serializeMongoose(log)} />
       </div>
     </SiteManagerLayout>
   );

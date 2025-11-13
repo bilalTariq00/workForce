@@ -7,6 +7,7 @@ import { Employee } from '@/lib/models/Employee';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import SiteList from '@/components/hr/SiteList';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { serializeMongoose, serializeMongooseArray } from '@/lib/utils/serialize';
 
 /**
  * Sites Page
@@ -53,10 +54,10 @@ export default async function SitesPage() {
         .select('firstName lastName email employeeId')
         .lean();
 
-      return {
+      return serializeMongoose({
         ...site,
-        siteManagers, // Add array of Site Managers
-      };
+        siteManagers: serializeMongooseArray(siteManagers), // Add array of Site Managers
+      });
     })
   );
 
@@ -87,8 +88,8 @@ export default async function SitesPage() {
           </CardHeader>
           <CardContent>
             <SiteList 
-              initialSites={sitesWithManagers} 
-              allSiteManagers={allSiteManagers}
+              initialSites={serializeMongooseArray(sitesWithManagers)} 
+              allSiteManagers={serializeMongooseArray(allSiteManagers)}
             />
           </CardContent>
         </Card>

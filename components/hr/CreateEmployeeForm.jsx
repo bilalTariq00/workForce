@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,8 @@ export default function CreateEmployeeForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [sites, setSites] = useState([]);
+  const [loadingSites, setLoadingSites] = useState(true);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -25,7 +27,43 @@ export default function CreateEmployeeForm() {
     password: '',
     role: 'labour',
     payRate: '',
+    siteId: '',
+    annualLeaveBalance: '',
   });
+
+  // Fetch sites for dropdown
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        const response = await fetch('/api/v1/sites');
+        const data = await response.json();
+        if (data.success) {
+          setSites(data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching sites:', err);
+      } finally {
+        setLoadingSites(false);
+      }
+    };
+    fetchSites();
+  }, []);
+
+  // Clear site assignment and leave balance when role changes to a role that doesn't need them
+  useEffect(() => {
+    if (formData.role !== 'labour' && formData.role !== 'site_manager') {
+      // Clear siteId if role doesn't need site assignment
+      if (formData.siteId) {
+        setFormData((prev) => ({ ...prev, siteId: '' }));
+      }
+    }
+    if (formData.role !== 'labour') {
+      // Clear annualLeaveBalance if role is not labour
+      if (formData.annualLeaveBalance && formData.annualLeaveBalance !== '0') {
+        setFormData((prev) => ({ ...prev, annualLeaveBalance: '0' }));
+      }
+    }
+  }, [formData.role]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -50,6 +88,14 @@ export default function CreateEmployeeForm() {
         body: JSON.stringify({
           ...formData,
           payRate: formData.payRate ? parseFloat(formData.payRate) : undefined,
+          // Only include siteId for roles that need it
+          siteId: (formData.role === 'labour' || formData.role === 'site_manager') 
+            ? (formData.siteId || null) 
+            : undefined,
+          // Only include annualLeaveBalance for labour
+          annualLeaveBalance: formData.role === 'labour' && formData.annualLeaveBalance 
+            ? parseFloat(formData.annualLeaveBalance) 
+            : undefined,
         }),
       });
 
@@ -65,6 +111,8 @@ export default function CreateEmployeeForm() {
           password: '',
           role: 'labour',
           payRate: '',
+          siteId: '',
+          annualLeaveBalance: '0',
         });
         
         // Redirect to dashboard after 2 seconds
@@ -199,6 +247,58 @@ export default function CreateEmployeeForm() {
           />
         </div>
       </div>
+
+      {/* Site Assignment - Only for labour and site_manager */}
+      {(formData.role === 'labour' || formData.role === 'site_manager') && (
+        <div>
+          <label htmlFor="siteId" className="block text-sm font-medium text-foreground mb-2">
+            Assign to Site
+          </label>
+          <Select
+            value={formData.siteId}
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, siteId: value === 'none' ? '' : value }))}
+            disabled={loadingSites}
+          >
+            <SelectTrigger id="siteId" className="w-full">
+              <SelectValue placeholder={loadingSites ? "Loading sites..." : "Select a site (optional)"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No Site Assignment</SelectItem>
+              {sites.map((site) => (
+                <SelectItem key={site._id} value={site._id}>
+                  {site.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            Assign this employee to a site (optional)
+          </p>
+        </div>
+      )}
+
+      {/* Annual Leave Balance - Only for labour */}
+      {formData.role === 'labour' && (
+        <div>
+          <label htmlFor="annualLeaveBalance" className="block text-sm font-medium text-foreground mb-2">
+            Annual Leave Balance (days)
+          </label>
+          <Input
+            type="number"
+            id="annualLeaveBalance"
+            name="annualLeaveBalance"
+            value={formData.annualLeaveBalance}
+            onChange={handleChange}
+            min="0"
+            step="0.5"
+            className="w-full"
+            placeholder="0"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Initial annual leave balance in days (default: 0)
+          </p>
+        </div>
+      )}
 
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">

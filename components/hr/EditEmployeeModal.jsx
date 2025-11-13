@@ -8,6 +8,8 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sites, setSites] = useState([]);
+  const [loadingSites, setLoadingSites] = useState(true);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -17,7 +19,29 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
     role: 'labour',
     payRate: '',
     status: 'active',
+    siteId: '',
+    annualLeaveBalance: '',
   });
+
+  // Fetch sites for dropdown
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        const response = await fetch('/api/v1/sites');
+        const data = await response.json();
+        if (data.success) {
+          setSites(data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching sites:', err);
+      } finally {
+        setLoadingSites(false);
+      }
+    };
+    if (isOpen) {
+      fetchSites();
+    }
+  }, [isOpen]);
 
   // Load employee data when modal opens
   useEffect(() => {
@@ -31,10 +55,38 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
         role: employee.role || 'labour',
         payRate: employee.payRate?.toString() || '',
         status: employee.status || 'active',
+        siteId: employee.siteId?.toString() || '',
+        annualLeaveBalance: employee.annualLeaveBalance?.toString() || '',
       });
       setError('');
     }
   }, [employee, isOpen]);
+
+  // Clear site assignment and leave balance when role changes to a role that doesn't need them
+  useEffect(() => {
+    // Only run this effect if we have an employee loaded (to avoid clearing on initial load)
+    if (!employee || !isOpen) return;
+
+    if (formData.role !== 'labour' && formData.role !== 'site_manager') {
+      // Clear siteId if role doesn't need site assignment
+      setFormData((prev) => {
+        if (prev.siteId) {
+          return { ...prev, siteId: '' };
+        }
+        return prev;
+      });
+    }
+    if (formData.role !== 'labour') {
+      // Clear annualLeaveBalance if role is not labour
+      setFormData((prev) => {
+        if (prev.annualLeaveBalance && prev.annualLeaveBalance !== '0') {
+          return { ...prev, annualLeaveBalance: '0' };
+        }
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.role, employee, isOpen]);
 
   if (!isOpen || !employee) return null;
 
@@ -69,6 +121,26 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
       // Only include payRate if provided
       if (formData.payRate && formData.payRate.length > 0) {
         updateData.payRate = parseFloat(formData.payRate);
+      }
+
+      // Handle siteId assignment/unassignment - Only for roles that need it
+      if (formData.role === 'labour' || formData.role === 'site_manager') {
+        if (formData.siteId === '' || formData.siteId === 'none') {
+          updateData.siteId = null; // Unassign from site
+        } else if (formData.siteId) {
+          updateData.siteId = formData.siteId;
+        }
+      } else {
+        // For other roles, unassign from site if they were previously assigned
+        updateData.siteId = null;
+      }
+
+      // Only include annualLeaveBalance for labour role
+      if (formData.role === 'labour' && formData.annualLeaveBalance && formData.annualLeaveBalance.length > 0) {
+        updateData.annualLeaveBalance = parseFloat(formData.annualLeaveBalance);
+      } else if (formData.role !== 'labour') {
+        // For non-labour roles, set to 0 or undefined
+        updateData.annualLeaveBalance = 0;
       }
 
       console.log('Updating employee:', employee._id, 'with data:', updateData);
@@ -252,6 +324,52 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm sm:text-base"
             />
           </div>
+
+          {/* Site Assignment - Only for labour and site_manager */}
+          {(formData.role === 'labour' || formData.role === 'site_manager') && (
+            <div>
+              <label htmlFor="siteId" className="block text-sm font-medium text-gray-700 mb-1">
+                Assign to Site
+              </label>
+              <select
+                id="siteId"
+                name="siteId"
+                value={formData.siteId || 'none'}
+                onChange={(e) => setFormData((prev) => ({ ...prev, siteId: e.target.value === 'none' ? '' : e.target.value }))}
+                disabled={loadingSites}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm sm:text-base disabled:bg-gray-100"
+              >
+                <option value="none">No Site Assignment</option>
+                {sites.map((site) => (
+                  <option key={site._id} value={site._id}>
+                    {site.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Assign or unassign from a site</p>
+            </div>
+          )}
+
+          {/* Annual Leave Balance - Only for labour */}
+          {formData.role === 'labour' && (
+            <div>
+              <label htmlFor="annualLeaveBalance" className="block text-sm font-medium text-gray-700 mb-1">
+                Annual Leave Balance (days)
+              </label>
+              <input
+                type="number"
+                id="annualLeaveBalance"
+                name="annualLeaveBalance"
+                value={formData.annualLeaveBalance}
+                onChange={handleChange}
+                min="0"
+                step="0.5"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm sm:text-base"
+                placeholder="0"
+              />
+              <p className="text-xs text-gray-500 mt-1">Current annual leave balance in days</p>
+            </div>
+          )}
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
