@@ -26,7 +26,33 @@ export default async function Home() {
     redirect('/contracts-manager/dashboard');
   }
 
-  // For other roles (labour, etc.), check if attendance is marked today
+  // For labour workers, check if attendance is marked today
+  if (session.user.role === 'labour') {
+    await connectDB();
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const attendance = await Attendance.findOne({
+      employeeId: session.user.id,
+      date: {
+        $gte: today,
+        $lt: tomorrow,
+      },
+    });
+
+    // If attendance not marked, redirect to scan page
+    if (!attendance) {
+      redirect('/attendance/scan');
+    }
+
+    // Attendance marked, go to labour dashboard
+    redirect('/labour/dashboard');
+  }
+
+  // For other roles, check if attendance is marked today
   await connectDB();
   
   const today = new Date();

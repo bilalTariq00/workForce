@@ -51,6 +51,8 @@ export default function AttendanceScanPage() {
               router.push('/site-manager/dashboard');
             } else if (userRole === 'contracts_manager') {
               router.push('/contracts-manager/dashboard');
+            } else if (userRole === 'labour') {
+              router.push('/labour/dashboard');
             } else {
               router.push('/dashboard');
             }
@@ -242,8 +244,11 @@ export default function AttendanceScanPage() {
             router.push('/site-manager/dashboard');
           } else if (userRole === 'contracts_manager') {
             router.push('/contracts-manager/dashboard');
+          } else if (userRole === 'labour') {
+            // For labour workers, go to labour dashboard
+            router.push('/labour/dashboard');
           } else {
-            // For labour and other roles, go to personal dashboard
+            // For other roles, go to personal dashboard
             router.push('/dashboard');
           }
           router.refresh();

@@ -23,6 +23,16 @@ export default async function Dashboard() {
     redirect('/site-manager/dashboard');
   }
 
+  // Redirect Contracts Managers to their dashboard
+  if (session.user.role === 'contracts_manager') {
+    redirect('/contracts-manager/dashboard');
+  }
+
+  // Redirect Labour workers to their dashboard
+  if (session.user.role === 'labour') {
+    redirect('/labour/dashboard');
+  }
+
   // Check if attendance is marked today
   await connectDB();
   
