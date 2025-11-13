@@ -5,6 +5,7 @@ import { Trash2, Edit, MapPin, Building2, User, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CreateSiteForm from './CreateSiteForm';
 import AssignSiteManagerModal from './AssignSiteManagerModal';
+import EditSiteModal from './EditSiteModal';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -22,6 +23,7 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
   const [deletingId, setDeletingId] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [assignModalSite, setAssignModalSite] = useState(null);
+  const [editingSite, setEditingSite] = useState(null);
 
   // Sync sites with initialSites when it changes
   useEffect(() => {
@@ -73,6 +75,13 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
   const handleCreateSuccess = (newSite) => {
     setSites([newSite, ...sites]);
     setIsCreateModalOpen(false);
+  };
+
+  const handleEditSuccess = (updatedSite) => {
+    setSites(sites.map(site => 
+      site._id === updatedSite._id ? updatedSite : site
+    ));
+    setEditingSite(null);
   };
 
   /**
@@ -135,6 +144,13 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
                           <p className="text-xs text-gray-500 mt-1">{site.siteCode}</p>
                         </div>
                         <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingSite(site)}
+                            className="text-green-600 hover:text-green-800 p-1"
+                            title="Edit Site"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleOpenAssignModal(site)}
                             className="text-blue-600 hover:text-blue-800 p-1"
@@ -243,6 +259,13 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
                         <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end gap-3">
                             <button
+                              onClick={() => setEditingSite(site)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Edit Site"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => handleOpenAssignModal(site)}
                               className="text-blue-600 hover:text-blue-900"
                               title="Assign Site Manager"
@@ -267,6 +290,16 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Edit Site Modal */}
+      {editingSite && (
+        <EditSiteModal
+          isOpen={true}
+          onClose={() => setEditingSite(null)}
+          site={editingSite}
+          onSuccess={handleEditSuccess}
+        />
       )}
 
       {/* Assign Site Manager Modal */}
