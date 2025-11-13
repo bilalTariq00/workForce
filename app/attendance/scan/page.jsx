@@ -25,7 +25,9 @@ export default function AttendanceScanPage() {
   const [checkingAttendance, setCheckingAttendance] = useState(true);
   const [alreadyMarked, setAlreadyMarked] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [startingCamera, setStartingCamera] = useState(false);
   const scannerRef = useRef(null);
+  const videoRef = useRef(null);
   const qrCodeRegionId = 'qr-reader';
 
   // Check if attendance already marked
@@ -126,48 +128,185 @@ export default function AttendanceScanPage() {
     }
   };
 
-  // Start QR Scanner
+  // Start QR Scanner using qr-scanner (primary) with html5-qrcode fallback
   const startQRScanner = async () => {
     try {
-      // Dynamic import
-      const { Html5Qrcode } = await import('html5-qrcode');
-      
-      setShowScanner(true);
-      const html5QrCode = new Html5Qrcode(qrCodeRegionId);
-      scannerRef.current = html5QrCode;
+      setStartingCamera(true);
+      setError(''); // Clear any previous errors
 
-      await html5QrCode.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText) => {
-          // QR code scanned successfully
-          handleQRScan(decodedText);
-          stopQRScanner();
-        },
-        (errorMessage) => {
-          // Ignore scanning errors (they're frequent)
+      // Check if camera is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Camera is not supported in this browser. Please use manual entry.');
+        setStartingCamera(false);
+        return;
+      }
+
+      // Check if we're on HTTPS (required for camera access in most browsers)
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        setError('Camera requires HTTPS connection. Please use manual entry or access via HTTPS.');
+        setStartingCamera(false);
+        return;
+      }
+
+      setShowScanner(true);
+
+      // Try qr-scanner first (lighter and often works better)
+      try {
+        const QrScanner = (await import('qr-scanner')).default;
+        
+        // Get video element
+        const video = document.createElement('video');
+        video.id = 'qr-scanner-video';
+        video.style.width = '100%';
+        video.style.maxWidth = '100%';
+        video.style.borderRadius = '0.5rem';
+        video.setAttribute('playsinline', 'true');
+        
+        const container = document.getElementById(qrCodeRegionId);
+        if (!container) {
+          throw new Error('Scanner container not found');
         }
-      );
+        
+        container.innerHTML = '';
+        container.appendChild(video);
+        videoRef.current = video;
+
+        // Create QR scanner instance
+        const qrScanner = new QrScanner(
+          video,
+          (result) => {
+            // QR code scanned successfully
+            handleQRScan(result.data);
+            stopQRScanner();
+          },
+          {
+            onDecodeError: (error) => {
+              // Ignore decode errors (they're frequent during scanning)
+            },
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+          }
+        );
+
+        scannerRef.current = qrScanner;
+
+        // Start scanning with preferred camera (back camera on mobile)
+        await qrScanner.start({ preferredCamera: 'environment' });
+        setStartingCamera(false);
+        return; // Success!
+      } catch (qrScannerError) {
+        console.warn('qr-scanner failed, trying html5-qrcode fallback:', qrScannerError);
+        
+        // Fallback to html5-qrcode
+        try {
+          const { Html5Qrcode } = await import('html5-qrcode');
+          const html5QrCode = new Html5Qrcode(qrCodeRegionId);
+          scannerRef.current = html5QrCode;
+
+          // Try different camera configurations
+          const cameraConfigs = [
+            { facingMode: 'environment' },
+            { facingMode: 'user' },
+            { facingMode: { exact: 'environment' } },
+            { facingMode: { exact: 'user' } },
+          ];
+
+          let cameraStarted = false;
+          let lastError = null;
+
+          for (const config of cameraConfigs) {
+            try {
+              await html5QrCode.start(
+                config,
+                {
+                  fps: 10,
+                  qrbox: { width: 250, height: 250 },
+                  aspectRatio: 1.0,
+                },
+                (decodedText) => {
+                  handleQRScan(decodedText);
+                  stopQRScanner();
+                },
+                (errorMessage) => {
+                  // Ignore scanning errors
+                }
+              );
+              cameraStarted = true;
+              setStartingCamera(false);
+              break;
+            } catch (configError) {
+              lastError = configError;
+              continue;
+            }
+          }
+
+          if (!cameraStarted) {
+            throw lastError || new Error('All camera configurations failed');
+          }
+        } catch (html5Error) {
+          throw html5Error;
+        }
+      }
     } catch (err) {
-      setError('Failed to start camera. Please use manual entry.');
+      console.error('QR Scanner error:', err);
       setShowScanner(false);
+      setStartingCamera(false);
+      
+      // Clean up
+      if (scannerRef.current) {
+        if (scannerRef.current.stop) {
+          scannerRef.current.stop().catch(() => {});
+        }
+        if (scannerRef.current.destroy) {
+          scannerRef.current.destroy();
+        }
+        scannerRef.current = null;
+      }
+      
+      // Provide specific error messages
+      if (err.name === 'NotAllowedError' || err.message?.includes('permission')) {
+        setError('Camera permission denied. Please allow camera access in your browser settings and try again.');
+      } else if (err.name === 'NotFoundError' || err.message?.includes('no camera')) {
+        setError('No camera found. Please ensure your device has a camera.');
+      } else if (err.name === 'NotReadableError' || err.message?.includes('already in use')) {
+        setError('Camera is already in use. Please close other apps using the camera.');
+      } else {
+        setError(`Failed to start camera: ${err.message || 'Unknown error'}. Please use manual entry.`);
+      }
     }
   };
 
-  const stopQRScanner = () => {
+  const stopQRScanner = async () => {
     if (scannerRef.current) {
-      scannerRef.current
-        .stop()
-        .then(() => {
-          scannerRef.current.clear();
-          setShowScanner(false);
-        })
-        .catch((err) => {
-          console.error('Error stopping scanner:', err);
-        });
+      try {
+        // Check if it's qr-scanner (has destroy method) or html5-qrcode
+        if (scannerRef.current.destroy) {
+          // qr-scanner: stop and destroy
+          scannerRef.current.stop();
+          scannerRef.current.destroy();
+        } else if (scannerRef.current.stop) {
+          // html5-qrcode: stop returns a promise
+          await scannerRef.current.stop();
+          if (scannerRef.current.clear) {
+            scannerRef.current.clear();
+          }
+        }
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+      } finally {
+        scannerRef.current = null;
+        if (videoRef.current) {
+          videoRef.current = null;
+        }
+        // Clear the container
+        const container = document.getElementById(qrCodeRegionId);
+        if (container) {
+          container.innerHTML = '';
+        }
+        setShowScanner(false);
+      }
+    } else {
+      setShowScanner(false);
     }
   };
 
@@ -288,13 +427,27 @@ export default function AttendanceScanPage() {
 
                   <Button
                     onClick={startQRScanner}
-                    disabled={!location}
+                    disabled={!location || loading || startingCamera}
                     className="w-full"
                     variant="outline"
                   >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Open Camera Scanner
+                    {startingCamera ? (
+                      <>
+                        <Loader className="h-4 w-4 mr-2 animate-spin" />
+                        Starting Camera...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="h-4 w-4 mr-2" />
+                        Open Camera Scanner
+                      </>
+                    )}
                   </Button>
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    {!location && 'Location required to enable camera'}
+                    {location && !startingCamera && 'Click to start camera and scan QR code'}
+                    {location && startingCamera && 'Requesting camera permission...'}
+                  </p>
 
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
