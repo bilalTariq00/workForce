@@ -129,6 +129,7 @@ export default function AttendanceScanPage() {
   // Start QR Scanner
   const startQRScanner = async () => {
     try {
+      setError(''); // Clear any previous errors
       // Dynamic import
       const { Html5Qrcode } = await import('html5-qrcode');
       
@@ -152,7 +153,21 @@ export default function AttendanceScanPage() {
         }
       );
     } catch (err) {
-      setError('Failed to start camera. Please use manual entry.');
+      console.error('Camera error:', err);
+      let errorMsg = 'Failed to open camera. ';
+      
+      // Provide specific error messages
+      if (err.name === 'NotAllowedError' || err.message?.includes('permission')) {
+        errorMsg += 'Camera permission denied. Please allow camera access in your browser settings and try again, or use manual entry below.';
+      } else if (err.name === 'NotFoundError' || err.message?.includes('no camera')) {
+        errorMsg += 'No camera found. Please use manual entry below.';
+      } else if (err.message?.includes('HTTPS')) {
+        errorMsg += 'Camera requires HTTPS connection. Please use manual entry below.';
+      } else {
+        errorMsg += 'Please use manual entry below.';
+      }
+      
+      setError(errorMsg);
       setShowScanner(false);
     }
   };
@@ -253,7 +268,13 @@ export default function AttendanceScanPage() {
             {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium mb-1">Camera Error</p>
+                    <p className="text-xs">{error}</p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -305,36 +326,60 @@ export default function AttendanceScanPage() {
                     </div>
                   </div>
 
-                  {/* Manual QR Entry */}
-                  <form onSubmit={handleManualSubmit} className="space-y-3">
-                    <div>
-                      <Input
-                        type="text"
-                        placeholder='{"type":"attendance","version":"1.0"}'
-                        value={manualQR}
-                        onChange={(e) => setManualQR(e.target.value)}
-                        disabled={loading || !location}
-                        className="text-center font-mono text-sm"
-                      />
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        Enter the QR code data shown on the laptop screen
-                      </p>
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={loading || !location || !manualQR.trim()}
-                      className="w-full"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader className="h-4 w-4 mr-2 animate-spin" />
-                          Marking Attendance...
-                        </>
-                      ) : (
-                        'Mark Attendance'
-                      )}
-                    </Button>
-                  </form>
+                  {/* Manual QR Entry - Always Visible */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-blue-900 mb-2">
+                      Manual Entry (If camera doesn't work)
+                    </p>
+                    <form onSubmit={handleManualSubmit} className="space-y-3">
+                      <div>
+                        <div className="flex gap-2 mb-2">
+                          <Input
+                            type="text"
+                            placeholder='{"type":"attendance","version":"1.0"}'
+                            value={manualQR}
+                            onChange={(e) => setManualQR(e.target.value)}
+                            disabled={loading || !location}
+                            className="text-center font-mono text-sm bg-white flex-1"
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setManualQR(UNIVERSAL_QR_CODE);
+                            }}
+                            disabled={loading || !location}
+                            variant="outline"
+                            className="whitespace-nowrap"
+                            title="Fill with default QR code"
+                          >
+                            Fill
+                          </Button>
+                        </div>
+                        <p className="text-xs text-blue-700 mt-2 text-center">
+                          Copy and paste the QR code data from the laptop screen, or click "Fill" to use the default code
+                        </p>
+                        <div className="mt-2 p-2 bg-white rounded border border-blue-200">
+                          <p className="text-xs text-blue-600 text-center font-mono break-all">
+                            {UNIVERSAL_QR_CODE}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="submit"
+                        disabled={loading || !location || !manualQR.trim()}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader className="h-4 w-4 mr-2 animate-spin" />
+                            Marking Attendance...
+                          </>
+                        ) : (
+                          'Mark Attendance Manually'
+                        )}
+                      </Button>
+                    </form>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-4">
