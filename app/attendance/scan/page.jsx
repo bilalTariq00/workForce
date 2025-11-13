@@ -25,6 +25,7 @@ export default function AttendanceScanPage() {
   const [checkingAttendance, setCheckingAttendance] = useState(true);
   const [alreadyMarked, setAlreadyMarked] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const scannerRef = useRef(null);
   const qrCodeRegionId = 'qr-reader';
 
@@ -126,45 +127,113 @@ export default function AttendanceScanPage() {
     }
   };
 
+  // Check camera permissions
+  const checkCameraPermission = async () => {
+    try {
+      // Check if we can query permissions
+      if (navigator.permissions && navigator.permissions.query) {
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+        return permissionStatus.state !== 'denied';
+      }
+      return true; // Assume allowed if we can't check
+    } catch (err) {
+      console.log('Permission check not supported:', err);
+      return true; // Assume allowed if check fails
+    }
+  };
+
   // Start QR Scanner
   const startQRScanner = async () => {
     try {
       setError(''); // Clear any previous errors
+      setCameraLoading(true);
+      setShowScanner(true);
+
+      // Check camera availability first
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported. Please use a modern browser or manual entry.');
+      }
+
       // Dynamic import
       const { Html5Qrcode } = await import('html5-qrcode');
       
-      setShowScanner(true);
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
 
+      // Try to get available cameras - this will also request permission
+      let cameraId = null;
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        console.log('Available cameras:', devices);
+        if (devices && devices.length > 0) {
+          // Prefer back camera (environment) on mobile
+          const backCamera = devices.find(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('rear') ||
+            device.label.toLowerCase().includes('environment')
+          );
+          cameraId = backCamera ? backCamera.id : devices[0].id;
+        }
+      } catch (camErr) {
+        console.warn('Could not enumerate cameras, will use facingMode:', camErr);
+      }
+
+      // Use camera ID if found, otherwise use facingMode
+      const cameraConfig = cameraId || { facingMode: 'environment' };
+      console.log('Starting QR scanner with:', cameraConfig);
+
       await html5QrCode.start(
-        { facingMode: 'environment' },
+        cameraConfig,
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 },
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+            // Make QR box responsive - 80% of the smaller dimension
+            const minEdgePercentage = 0.8;
+            const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+            const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+            return {
+              width: qrboxSize,
+              height: qrboxSize
+            };
+          },
+          aspectRatio: 1.0,
+          disableFlip: false,
         },
         (decodedText) => {
           // QR code scanned successfully
+          console.log('QR Code scanned:', decodedText);
           handleQRScan(decodedText);
           stopQRScanner();
         },
         (errorMessage) => {
-          // Ignore scanning errors (they're frequent)
+          // Ignore scanning errors (they're frequent during scanning)
+          // Only log if it's not a common scanning error
+          if (!errorMessage.includes('NotFoundException') && 
+              !errorMessage.includes('No QR code') &&
+              !errorMessage.includes('QR code parse error')) {
+            // Silent - these are normal during scanning
+          }
         }
       );
+
+      setCameraLoading(false);
+      console.log('Camera started successfully');
     } catch (err) {
       console.error('Camera error:', err);
+      setCameraLoading(false);
       let errorMsg = 'Failed to open camera. ';
       
       // Provide specific error messages
-      if (err.name === 'NotAllowedError' || err.message?.includes('permission')) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message?.includes('permission') || err.message?.includes('Permission denied')) {
         errorMsg += 'Camera permission denied. Please allow camera access in your browser settings and try again, or use manual entry below.';
-      } else if (err.name === 'NotFoundError' || err.message?.includes('no camera')) {
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError' || err.message?.includes('no camera') || err.message?.includes('No camera')) {
         errorMsg += 'No camera found. Please use manual entry below.';
-      } else if (err.message?.includes('HTTPS')) {
+      } else if (err.message?.includes('HTTPS') || err.message?.includes('secure context')) {
         errorMsg += 'Camera requires HTTPS connection. Please use manual entry below.';
+      } else if (err.message?.includes('not supported')) {
+        errorMsg += err.message;
       } else {
-        errorMsg += 'Please use manual entry below.';
+        errorMsg += `Error: ${err.message || 'Unknown error'}. Please use manual entry below.`;
       }
       
       setError(errorMsg);
@@ -383,13 +452,40 @@ export default function AttendanceScanPage() {
                 </>
               ) : (
                 <div className="space-y-4">
-                  <div id={qrCodeRegionId} className="w-full rounded-lg overflow-hidden"></div>
+                  {cameraLoading ? (
+                    <div className="flex flex-col items-center justify-center p-8 bg-muted rounded-lg">
+                      <Loader className="h-8 w-8 animate-spin text-primary mb-4" />
+                      <p className="text-sm text-muted-foreground text-center">
+                        Requesting camera permission...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Please allow camera access when prompted
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div id={qrCodeRegionId} className="w-full rounded-lg overflow-hidden bg-black min-h-[300px]"></div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Point your camera at the QR code
+                        </p>
+                      </div>
+                    </>
+                  )}
                   <Button
                     onClick={stopQRScanner}
                     variant="outline"
                     className="w-full"
+                    disabled={cameraLoading}
                   >
-                    Cancel Scanning
+                    {cameraLoading ? (
+                      <>
+                        <Loader className="h-4 w-4 mr-2 animate-spin" />
+                        Initializing...
+                      </>
+                    ) : (
+                      'Cancel Scanning'
+                    )}
                   </Button>
                 </div>
               )}
