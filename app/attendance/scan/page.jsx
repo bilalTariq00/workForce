@@ -25,7 +25,6 @@ export default function AttendanceScanPage() {
   const [checkingAttendance, setCheckingAttendance] = useState(true);
   const [alreadyMarked, setAlreadyMarked] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-  const [cameraLoading, setCameraLoading] = useState(false);
   const scannerRef = useRef(null);
   const qrCodeRegionId = 'qr-reader';
 
@@ -127,229 +126,50 @@ export default function AttendanceScanPage() {
     }
   };
 
-  // Check camera permissions
-  const checkCameraPermission = async () => {
-    try {
-      // Check if we can query permissions
-      if (navigator.permissions && navigator.permissions.query) {
-        const permissionStatus = await navigator.permissions.query({ name: 'camera' });
-        return permissionStatus.state !== 'denied';
-      }
-      return true; // Assume allowed if we can't check
-    } catch (err) {
-      console.log('Permission check not supported:', err);
-      return true; // Assume allowed if check fails
-    }
-  };
-
   // Start QR Scanner
   const startQRScanner = async () => {
     try {
-      setError(''); // Clear any previous errors
-      setCameraLoading(true);
-      setShowScanner(true);
-
-      // Check camera availability first
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not supported. Please use a modern browser or manual entry.');
-      }
-
-      // Wait for DOM element to be ready
-      await new Promise((resolve) => {
-        const checkElement = () => {
-          const element = document.getElementById(qrCodeRegionId);
-          if (element) {
-            resolve();
-          } else {
-            setTimeout(checkElement, 50);
-          }
-        };
-        checkElement();
-      });
-
-      // Small delay to ensure DOM is fully rendered
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       // Dynamic import
       const { Html5Qrcode } = await import('html5-qrcode');
       
-      // Clean up any existing scanner instance
-      if (scannerRef.current) {
-        try {
-          await scannerRef.current.stop();
-          scannerRef.current.clear();
-        } catch (e) {
-          console.warn('Error cleaning up previous scanner:', e);
-        }
-      }
-
+      setShowScanner(true);
       const html5QrCode = new Html5Qrcode(qrCodeRegionId);
       scannerRef.current = html5QrCode;
 
-      // Request camera permission explicitly first with timeout
-      console.log('Requesting camera permission...');
-      let permissionGranted = false;
-      try {
-        const permissionPromise = navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
-        });
-        
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Permission request timeout')), 10000)
-        );
-
-        const stream = await Promise.race([permissionPromise, timeoutPromise]);
-        stream.getTracks().forEach(track => track.stop()); // Stop test stream
-        permissionGranted = true;
-        console.log('Camera permission granted');
-      } catch (permErr) {
-        console.error('Permission error:', permErr);
-        if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
-          throw new Error('Camera permission denied. Please allow camera access in your browser settings.');
-        } else if (permErr.message === 'Permission request timeout') {
-          throw new Error('Camera permission request timed out. Please try again or use manual entry.');
-        }
-        // Continue anyway - some browsers grant permission during getCameras()
-      }
-
-      // Try to get available cameras with timeout
-      let cameraId = null;
-      try {
-        const camerasPromise = Html5Qrcode.getCameras();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Camera enumeration timeout')), 5000)
-        );
-
-        const devices = await Promise.race([camerasPromise, timeoutPromise]);
-        console.log('Available cameras:', devices);
-        if (devices && devices.length > 0) {
-          // Prefer back camera (environment) on mobile
-          const backCamera = devices.find(device => 
-            device.label.toLowerCase().includes('back') || 
-            device.label.toLowerCase().includes('rear') ||
-            device.label.toLowerCase().includes('environment')
-          );
-          cameraId = backCamera ? backCamera.id : devices[0].id;
-        }
-      } catch (camErr) {
-        console.warn('Could not enumerate cameras, will use facingMode:', camErr);
-        if (camErr.message === 'Camera enumeration timeout') {
-          console.warn('Camera enumeration timed out, using default facingMode');
-        }
-      }
-
-      // Use camera ID if found, otherwise use facingMode
-      const cameraConfig = cameraId || { facingMode: 'environment' };
-      console.log('Starting QR scanner with:', cameraConfig);
-
-      // Start scanner with timeout
-      const startPromise = html5QrCode.start(
-        cameraConfig,
+      await html5QrCode.start(
+        { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: function(viewfinderWidth, viewfinderHeight) {
-            // Make QR box responsive - 70% of the smaller dimension for better detection
-            const minEdgePercentage = 0.7;
-            const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
-            return {
-              width: qrboxSize,
-              height: qrboxSize
-            };
-          },
-          aspectRatio: 1.0,
-          disableFlip: false,
+          qrbox: { width: 250, height: 250 },
         },
         (decodedText) => {
           // QR code scanned successfully
-          console.log('QR Code scanned:', decodedText);
           handleQRScan(decodedText);
           stopQRScanner();
         },
         (errorMessage) => {
-          // Ignore scanning errors (they're frequent during scanning)
-          // These are normal and expected while scanning
+          // Ignore scanning errors (they're frequent)
         }
       );
-
-      const startTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Camera start timeout')), 15000)
-      );
-
-      await Promise.race([startPromise, startTimeoutPromise]);
-
-      setCameraLoading(false);
-      console.log('Camera started successfully');
     } catch (err) {
-      console.error('Camera error:', err);
-      setCameraLoading(false);
-      let errorMsg = 'Failed to open camera. ';
-      
-      // Provide specific error messages
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message?.includes('permission') || err.message?.includes('Permission denied')) {
-        errorMsg += 'Camera permission denied. Please allow camera access in your browser settings and try again, or use manual entry below.';
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError' || err.message?.includes('no camera') || err.message?.includes('No camera')) {
-        errorMsg += 'No camera found. Please use manual entry below.';
-      } else if (err.message?.includes('HTTPS') || err.message?.includes('secure context')) {
-        errorMsg += 'Camera requires HTTPS connection. Please use manual entry below.';
-      } else if (err.message?.includes('timeout')) {
-        errorMsg += 'Camera initialization timed out. Please try again or use manual entry below.';
-      } else if (err.message?.includes('not supported')) {
-        errorMsg += err.message;
-      } else {
-        errorMsg += `Error: ${err.message || 'Unknown error'}. Please use manual entry below.`;
-      }
-      
-      setError(errorMsg);
+      setError('Failed to start camera. Please use manual entry.');
       setShowScanner(false);
-      
-      // Clean up on error
-      if (scannerRef.current) {
-        try {
-          scannerRef.current.clear();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-      }
     }
   };
 
-  const stopQRScanner = async () => {
+  const stopQRScanner = () => {
     if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-        scannerRef.current = null;
-        setShowScanner(false);
-        setCameraLoading(false);
-      } catch (err) {
-        console.error('Error stopping scanner:', err);
-        // Force cleanup even if stop fails
-        try {
+      scannerRef.current
+        .stop()
+        .then(() => {
           scannerRef.current.clear();
-        } catch (e) {
-          // Ignore
-        }
-        scannerRef.current = null;
-        setShowScanner(false);
-        setCameraLoading(false);
-      }
-    } else {
-      setShowScanner(false);
-      setCameraLoading(false);
+          setShowScanner(false);
+        })
+        .catch((err) => {
+          console.error('Error stopping scanner:', err);
+        });
     }
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-        scannerRef.current.clear();
-        scannerRef.current = null;
-      }
-    };
-  }, []);
 
   // Redirect HR/Admin users - they don't need to mark attendance
   useEffect(() => {
@@ -433,13 +253,7 @@ export default function AttendanceScanPage() {
             {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium mb-1">Camera Error</p>
-                    <p className="text-xs">{error}</p>
-                  </div>
-                </div>
+                {error}
               </div>
             )}
 
@@ -491,104 +305,46 @@ export default function AttendanceScanPage() {
                     </div>
                   </div>
 
-                  {/* Manual QR Entry - Always Visible */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm font-medium text-blue-900 mb-2">
-                      Manual Entry (If camera doesn't work)
-                    </p>
-                    <form onSubmit={handleManualSubmit} className="space-y-3">
-                      <div>
-                        <div className="flex gap-2 mb-2">
-                          <Input
-                            type="text"
-                            placeholder='{"type":"attendance","version":"1.0"}'
-                            value={manualQR}
-                            onChange={(e) => setManualQR(e.target.value)}
-                            disabled={loading || !location}
-                            className="text-center font-mono text-sm bg-white flex-1"
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              setManualQR(UNIVERSAL_QR_CODE);
-                            }}
-                            disabled={loading || !location}
-                            variant="outline"
-                            className="whitespace-nowrap"
-                            title="Fill with default QR code"
-                          >
-                            Fill
-                          </Button>
-                        </div>
-                        <p className="text-xs text-blue-700 mt-2 text-center">
-                          Copy and paste the QR code data from the laptop screen, or click "Fill" to use the default code
-                        </p>
-                        <div className="mt-2 p-2 bg-white rounded border border-blue-200">
-                          <p className="text-xs text-blue-600 text-center font-mono break-all">
-                            {UNIVERSAL_QR_CODE}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="submit"
-                        disabled={loading || !location || !manualQR.trim()}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader className="h-4 w-4 mr-2 animate-spin" />
-                            Marking Attendance...
-                          </>
-                        ) : (
-                          'Mark Attendance Manually'
-                        )}
-                      </Button>
-                    </form>
-                  </div>
+                  {/* Manual QR Entry */}
+                  <form onSubmit={handleManualSubmit} className="space-y-3">
+                    <div>
+                      <Input
+                        type="text"
+                        placeholder='{"type":"attendance","version":"1.0"}'
+                        value={manualQR}
+                        onChange={(e) => setManualQR(e.target.value)}
+                        disabled={loading || !location}
+                        className="text-center font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Enter the QR code data shown on the laptop screen
+                      </p>
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={loading || !location || !manualQR.trim()}
+                      className="w-full"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader className="h-4 w-4 mr-2 animate-spin" />
+                          Marking Attendance...
+                        </>
+                      ) : (
+                        'Mark Attendance'
+                      )}
+                    </Button>
+                  </form>
                 </>
               ) : (
                 <div className="space-y-4">
-                  {cameraLoading ? (
-                    <div className="flex flex-col items-center justify-center p-8 bg-muted rounded-lg">
-                      <Loader className="h-8 w-8 animate-spin text-primary mb-4" />
-                      <p className="text-sm text-muted-foreground text-center">
-                        Requesting camera permission...
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-2 text-center">
-                        Please allow camera access when prompted
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div 
-                        id={qrCodeRegionId} 
-                        className="w-full rounded-lg overflow-hidden bg-black"
-                        style={{ minHeight: '300px', position: 'relative' }}
-                      ></div>
-                      <div className="text-center space-y-2">
-                        <p className="text-xs text-muted-foreground">
-                          Point your camera at the QR code
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          The camera view should appear above
-                        </p>
-                      </div>
-                    </>
-                  )}
+                  <div id={qrCodeRegionId} className="w-full rounded-lg overflow-hidden"></div>
                   <Button
                     onClick={stopQRScanner}
                     variant="outline"
                     className="w-full"
-                    disabled={cameraLoading}
                   >
-                    {cameraLoading ? (
-                      <>
-                        <Loader className="h-4 w-4 mr-2 animate-spin" />
-                        Initializing...
-                      </>
-                    ) : (
-                      'Cancel Scanning'
-                    )}
+                    Cancel Scanning
                   </Button>
                 </div>
               )}
