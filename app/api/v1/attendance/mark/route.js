@@ -172,8 +172,9 @@ export async function POST(req) {
     }
 
     // Check for expired certifications (Gate Access Blocking)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Reuse the 'today' variable defined earlier (line 49)
+    const todayForCert = new Date(today);
+    todayForCert.setHours(0, 0, 0, 0);
 
     const expiredCertifications = await Certification.find({
       employeeId: session.user.id,
@@ -181,7 +182,7 @@ export async function POST(req) {
         { status: 'expired' },
         {
           status: { $in: ['valid', 'pending_validation'] },
-          expiryDate: { $lt: today },
+          expiryDate: { $lt: todayForCert },
         },
       ],
     }).lean();
@@ -209,7 +210,7 @@ export async function POST(req) {
     const validCertifications = await Certification.find({
       employeeId: session.user.id,
       status: 'valid',
-      expiryDate: { $gte: today },
+      expiryDate: { $gte: todayForCert },
     }).lean();
 
     // Optional: Require specific certifications (e.g., SafePass) for site access

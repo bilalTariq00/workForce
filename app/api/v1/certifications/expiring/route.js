@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { checkExpiringCertifications, getExpiringCertificationsForEmployee } from '@/lib/services/certificationReminder';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/v1/certifications/expiring
  * 
