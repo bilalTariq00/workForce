@@ -44,14 +44,55 @@ export default async function LabourDashboard() {
   if (dbConnected) {
     try {
       console.log('[LABOUR DASHBOARD] Fetching employee with ID:', session.user.id);
+      console.log('[LABOUR DASHBOARD] Session email:', session.user?.email);
+      
+      // Try to find by _id first
       employee = await Employee.findById(session.user.id)
         .populate('siteId', 'name siteCode address')
         .lean();
       
+      // If not found by ID, try by email (fallback)
+      if (!employee && session.user?.email) {
+        console.log('[LABOUR DASHBOARD] Employee not found by ID, trying email:', session.user.email);
+        employee = await Employee.findOne({ email: session.user.email.toLowerCase() })
+          .populate('siteId', 'name siteCode address')
+          .lean();
+      }
+      
       if (employee) {
-        console.log('[LABOUR DASHBOARD] Employee found:', employee.email, employee.role);
+        console.log('[LABOUR DASHBOARD] Employee found:', employee.email, employee.role, 'Status:', employee.status);
+        
+        // Check if employee is active
+        if (employee.status !== 'active') {
+          console.warn('[LABOUR DASHBOARD] Employee found but status is:', employee.status);
+          return (
+            <LabourLayout>
+              <div className="space-y-6">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+                  <h2 className="text-xl font-bold text-yellow-800 dark:text-yellow-400 mb-2">
+                    Account Inactive
+                  </h2>
+                  <p className="text-yellow-700 dark:text-yellow-300 mb-4">
+                    Your account status is: <strong>{employee.status}</strong>
+                  </p>
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    Please contact HR to activate your account.
+                  </p>
+                </div>
+              </div>
+            </LabourLayout>
+          );
+        }
       } else {
-        console.error('[LABOUR DASHBOARD] Employee not found for ID:', session.user.id);
+        console.error('[LABOUR DASHBOARD] Employee not found for ID:', session.user.id, 'or email:', session.user?.email);
+        
+        // Try to find any employee with this email to help debug
+        if (session.user?.email) {
+          const anyEmployee = await Employee.findOne({ email: session.user.email.toLowerCase() }).lean();
+          if (anyEmployee) {
+            console.error('[LABOUR DASHBOARD] Found employee with different ID:', anyEmployee._id, 'Expected:', session.user.id);
+          }
+        }
       }
     } catch (error) {
       console.error('[LABOUR DASHBOARD] Error fetching employee:', error);
@@ -79,9 +120,20 @@ export default async function LabourDashboard() {
             <p className="text-sm text-red-600 dark:text-red-400">
               Please contact HR or try logging out and logging back in.
             </p>
-            <p className="text-xs text-red-500 dark:text-red-500 mt-2">
-              Session User ID: {session.user.id || 'N/A'}
-            </p>
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-red-500 dark:text-red-500">
+                <strong>Session User ID:</strong> {session.user.id || 'N/A'}
+              </p>
+              <p className="text-xs text-red-500 dark:text-red-500">
+                <strong>Session Email:</strong> {session.user?.email || 'N/A'}
+              </p>
+              <p className="text-xs text-red-500 dark:text-red-500">
+                <strong>Session Role:</strong> {session.user?.role || 'N/A'}
+              </p>
+              <p className="text-xs text-blue-500 dark:text-blue-400 mt-2">
+                💡 <strong>Debug Tip:</strong> Visit <code className="bg-red-100 dark:bg-red-900 px-1 rounded">/api/v1/debug/employee</code> to check if your employee record exists in the database.
+              </p>
+            </div>
           </div>
         </div>
       </LabourLayout>
@@ -164,65 +216,67 @@ export default async function LabourDashboard() {
 
   return (
     <LabourLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Welcome Section */}
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
             Welcome, {serializedEmployee?.firstName || serializedEmployee?.name || 'User'}!
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Employee ID: {String(serializedEmployee?.employeeId || 'N/A')} | {siteName ? `Site: ${siteName}` : 'No site assigned'}
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
+            Employee ID: {String(serializedEmployee?.employeeId || 'N/A')} {siteName && <span className="hidden sm:inline">| Site: {siteName}</span>}
+            {siteName && <span className="sm:hidden block mt-1">Site: {siteName}</span>}
+            {!siteName && <span className="block sm:inline sm:ml-1 mt-1 sm:mt-0">| No site assigned</span>}
           </p>
         </div>
 
         {/* Today's Attendance Card */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
               Today's Attendance
             </CardTitle>
-            <CardDescription>Your attendance status for today</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Your attendance status for today</CardDescription>
           </CardHeader>
           <CardContent>
             {serializedAttendance ? (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-semibold">Attendance Marked</span>
+                  <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                  <span className="font-semibold text-sm sm:text-base">Attendance Marked</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Site</p>
-                    <p className="font-medium">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Site</p>
+                    <p className="font-medium text-sm sm:text-base break-words">
                       {(serializedAttendance.siteId && typeof serializedAttendance.siteId === 'object' ? serializedAttendance.siteId.name : null) || 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Sign In Time</p>
-                    <p className="font-medium">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Sign In Time</p>
+                    <p className="font-medium text-sm sm:text-base">
                       {serializedAttendance.signInTime ? new Date(serializedAttendance.signInTime).toLocaleTimeString() : 'N/A'}
                     </p>
                   </div>
                   {serializedAttendance.signOutTime && (
                     <div>
-                      <p className="text-sm text-muted-foreground">Sign Out Time</p>
-                      <p className="font-medium">
+                      <p className="text-xs sm:text-sm text-muted-foreground">Sign Out Time</p>
+                      <p className="font-medium text-sm sm:text-base">
                         {new Date(serializedAttendance.signOutTime).toLocaleTimeString()}
                       </p>
                     </div>
                   )}
                   <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <p className="font-medium capitalize">{serializedAttendance.status}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Status</p>
+                    <p className="font-medium capitalize text-sm sm:text-base">{serializedAttendance.status}</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
-                <p className="text-muted-foreground mb-4">No attendance marked for today</p>
+              <div className="text-center py-4 sm:py-6">
+                <p className="text-sm sm:text-base text-muted-foreground mb-4">No attendance marked for today</p>
                 <Link href="/attendance/scan">
-                  <Button>Mark Attendance</Button>
+                  <Button className="w-full sm:w-auto px-6 py-2.5 sm:py-2 text-sm sm:text-base">Mark Attendance</Button>
                 </Link>
               </div>
             )}
@@ -230,72 +284,72 @@ export default async function LabourDashboard() {
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
+            <CardHeader className="pb-3 sm:pb-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
                 Leave Request
               </CardTitle>
-              <CardDescription>Request time off or leave</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Request time off or leave</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-2 sm:space-y-3">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Annual Leave Balance: <span className="font-semibold">{Number(serializedEmployee?.annualLeaveBalance) || 0} days</span>
                 </p>
                 <Link href="/attendance/leave-request">
-                  <Button className="w-full">Request Leave</Button>
+                  <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation">Request Leave</Button>
                 </Link>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5" />
+            <CardHeader className="pb-3 sm:pb-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Award className="h-4 w-4 sm:h-5 sm:w-5" />
                 Certifications
               </CardTitle>
-              <CardDescription>Upload and manage your certifications</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Upload and manage your certifications</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-2 sm:space-y-3">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   SafePass, CSCS, First Aid, etc.
                 </p>
                 <Link href="/attendance/certifications">
-                  <Button className="w-full" variant="outline">Manage Certifications</Button>
+                  <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation" variant="outline">Manage Certifications</Button>
                 </Link>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
+            <CardHeader className="pb-3 sm:pb-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
                 Site Information
               </CardTitle>
-              <CardDescription>Your assigned site details</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Your assigned site details</CardDescription>
             </CardHeader>
             <CardContent>
               {siteName ? (
                 <div className="space-y-2">
-                  <p className="font-medium">{siteName}</p>
+                  <p className="font-medium text-sm sm:text-base break-words">{siteName}</p>
                   {(addressStreet || addressCity) && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground break-words">
                       {[addressStreet, addressCity].filter(Boolean).join(', ')}
                     </p>
                   )}
                   {siteCode && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Code: {siteCode}
                     </p>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No site assigned</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">No site assigned</p>
               )}
             </CardContent>
           </Card>
@@ -304,38 +358,40 @@ export default async function LabourDashboard() {
         {/* Recent Attendance */}
         {serializedRecentAttendance.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+            <CardHeader className="pb-3 sm:pb-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
                 Recent Attendance
               </CardTitle>
-              <CardDescription>Your attendance for the last 7 days</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Your attendance for the last 7 days</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {serializedRecentAttendance.map((att) => (
                   <div
                     key={att._id}
-                    className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-muted rounded-lg gap-2 sm:gap-4"
                   >
-                    <div>
-                      <p className="font-medium">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm sm:text-base">
                         {att.date ? new Date(att.date).toLocaleDateString('en-US', {
                           weekday: 'short',
                           month: 'short',
                           day: 'numeric',
                         }) : 'N/A'}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {(att.siteId && typeof att.siteId === 'object' ? att.siteId.name : null) || 'N/A'} • {att.signInTime ? new Date(att.signInTime).toLocaleTimeString() : 'N/A'}
+                      <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                        <span className="hidden sm:inline">{(att.siteId && typeof att.siteId === 'object' ? att.siteId.name : null) || 'N/A'} • </span>
+                        {att.signInTime ? new Date(att.signInTime).toLocaleTimeString() : 'N/A'}
+                        <span className="sm:hidden block">{(att.siteId && typeof att.siteId === 'object' ? att.siteId.name : null) || 'N/A'}</span>
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
+                        className={`px-2 sm:px-3 py-1 rounded text-xs font-medium ${
                           att.status === 'present'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
                         }`}
                       >
                         {att.status}
