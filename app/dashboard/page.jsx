@@ -3,6 +3,8 @@ import { authOptions } from '@/lib/auth/config';
 import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
+// Import Site model to ensure it's registered for populate()
+import { Site } from '@/lib/models/Site';
 import { LogOut } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 
@@ -16,6 +18,11 @@ export default async function Dashboard() {
   // Redirect HR to their dashboard
   if (session.user.role === 'hr_officer' || session.user.role === 'admin') {
     redirect('/hr/dashboard');
+  }
+
+  // Redirect EHS Officers to their dashboard
+  if (session.user.role === 'ehs_officer') {
+    redirect('/ehs/dashboard');
   }
 
   // Redirect Site Managers to their dashboard

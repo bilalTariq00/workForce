@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
+// Import Site model to ensure it's registered for populate()
+import { Site } from '@/lib/models/Site';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';

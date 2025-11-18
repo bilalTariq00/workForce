@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
+  Award,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -30,31 +32,60 @@ export default function EHSLayout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
 
-  const menuItems = [
+  // Helper function to mark active state
+  const markActive = (items) => {
+    return items.map(item => ({
+      ...item,
+      active: pathname === item.href || pathname.startsWith(item.href + '/'),
+    }));
+  };
+
+  // Main navigation items organized by category
+  const mainMenuItems = markActive([
     {
       title: 'Dashboard',
       icon: LayoutDashboard,
       href: '/ehs/dashboard',
+      description: 'Overview & statistics',
     },
+  ]);
+
+  const safetyMenuItems = markActive([
     {
       title: 'Incidents',
       icon: AlertTriangle,
       href: '/ehs/incidents',
+      description: 'Triage & investigation',
     },
     {
       title: 'Inspections',
       icon: ClipboardCheck,
       href: '/ehs/inspections',
+      description: 'Site inspections & audits',
     },
+  ]);
+
+  const complianceMenuItems = markActive([
     {
       title: 'Training',
       icon: GraduationCap,
       href: '/ehs/training',
+      description: 'Training register',
     },
-  ].map(item => ({
-    ...item,
-    active: pathname === item.href || pathname.startsWith(item.href + '/'),
-  }));
+    {
+      title: 'Certifications',
+      icon: Award,
+      href: '/hr/certifications',
+      description: 'Validate certifications',
+    },
+  ]);
+
+  // Combine all menu items for collapsed view
+  const allMenuItems = [
+    ...mainMenuItems,
+    ...safetyMenuItems,
+    ...complianceMenuItems,
+  ];
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' });
@@ -75,10 +106,13 @@ export default function EHSLayout({ children }) {
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0 bg-primary">
           <SidebarContent
-            menuItems={menuItems}
+            menuItems={allMenuItems}
             session={session}
             onLogout={handleLogout}
             onItemClick={() => setSidebarOpen(false)}
+            mainMenuItems={mainMenuItems}
+            safetyMenuItems={safetyMenuItems}
+            complianceMenuItems={complianceMenuItems}
           />
         </SheetContent>
       </Sheet>
@@ -89,11 +123,14 @@ export default function EHSLayout({ children }) {
           sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
         }`}>
           <SidebarContent
-            menuItems={menuItems}
+            menuItems={allMenuItems}
             session={session}
             onLogout={handleLogout}
             collapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            mainMenuItems={mainMenuItems}
+            safetyMenuItems={safetyMenuItems}
+            complianceMenuItems={complianceMenuItems}
           />
         </aside>
 
@@ -152,7 +189,17 @@ export default function EHSLayout({ children }) {
  * Sidebar Content Component
  * Displays navigation menu, user info, and logout button
  */
-function SidebarContent({ menuItems, session, onLogout, onItemClick, collapsed, onToggleCollapse }) {
+function SidebarContent({ 
+  menuItems, 
+  session, 
+  onLogout, 
+  onItemClick, 
+  collapsed, 
+  onToggleCollapse,
+  mainMenuItems = [],
+  safetyMenuItems = [],
+  complianceMenuItems = [],
+}) {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex flex-col h-full">
@@ -197,41 +244,144 @@ function SidebarContent({ menuItems, session, onLogout, onItemClick, collapsed, 
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const linkContent = (
-              <Link
-                href={item.href}
-                onClick={onItemClick}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 sm:py-3 text-sm font-medium transition-colors touch-manipulation ${
-                  collapsed ? 'justify-center' : ''
-                } ${
-                  item.active
-                    ? 'bg-white text-primary font-semibold'
-                    : 'text-white hover:bg-white/20 hover:text-white'
-                }`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && <span>{item.title}</span>}
-              </Link>
-            );
+        <nav className="flex-1 space-y-2 px-3 py-4 overflow-y-auto">
+          {/* Main Menu Section */}
+          {!collapsed && mainMenuItems.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-white/60 uppercase tracking-wider px-3 mb-2">
+                Main
+              </p>
+              <div className="space-y-1">
+                {mainMenuItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onItemClick}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 sm:py-3 text-sm font-medium transition-colors touch-manipulation ${
+                        item.active
+                          ? 'bg-white text-primary font-semibold'
+                          : 'text-white hover:bg-white/20 hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">{item.title}</div>
+                        {item.description && (
+                          <div className="text-xs opacity-70 truncate">{item.description}</div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-            if (collapsed) {
-              return (
-                <Tooltip key={item.href}>
-                  <TooltipTrigger asChild>
-                    {linkContent}
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {item.title}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            }
+          {/* Safety Section */}
+          {!collapsed && safetyMenuItems.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-white/60 uppercase tracking-wider px-3 mb-2">
+                Safety Management
+              </p>
+              <div className="space-y-1">
+                {safetyMenuItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onItemClick}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 sm:py-3 text-sm font-medium transition-colors touch-manipulation ${
+                        item.active
+                          ? 'bg-white text-primary font-semibold'
+                          : 'text-white hover:bg-white/20 hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">{item.title}</div>
+                        {item.description && (
+                          <div className="text-xs opacity-70 truncate">{item.description}</div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-            return <div key={item.href}>{linkContent}</div>;
-          })}
+          {/* Compliance Section */}
+          {!collapsed && complianceMenuItems.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-white/60 uppercase tracking-wider px-3 mb-2">
+                Compliance
+              </p>
+              <div className="space-y-1">
+                {complianceMenuItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onItemClick}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 sm:py-3 text-sm font-medium transition-colors touch-manipulation ${
+                        item.active
+                          ? 'bg-white text-primary font-semibold'
+                          : 'text-white hover:bg-white/20 hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">{item.title}</div>
+                        {item.description && (
+                          <div className="text-xs opacity-70 truncate">{item.description}</div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Collapsed View - Show all items as icons only */}
+          {collapsed && (
+            <div className="space-y-1">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const linkContent = (
+                  <Link
+                    href={item.href}
+                    onClick={onItemClick}
+                    className={`flex items-center justify-center rounded-lg px-3 py-2.5 sm:py-3 text-sm font-medium transition-colors touch-manipulation ${
+                      item.active
+                        ? 'bg-white text-primary font-semibold'
+                        : 'text-white hover:bg-white/20 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                  </Link>
+                );
+
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                      {linkContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div>{item.title}</div>
+                      {item.description && (
+                        <div className="text-xs opacity-80">{item.description}</div>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          )}
         </nav>
 
         {/* User Info & Logout */}

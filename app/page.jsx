@@ -16,6 +16,11 @@ export default async function Home() {
     redirect('/hr/dashboard');
   }
 
+  // EHS Officers go directly to their dashboard (they don't need to mark attendance)
+  if (session.user.role === 'ehs_officer') {
+    redirect('/ehs/dashboard');
+  }
+
   // Site Managers go directly to their dashboard (they don't need to mark attendance)
   if (session.user.role === 'site_manager') {
     redirect('/site-manager/dashboard');
