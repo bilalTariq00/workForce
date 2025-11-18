@@ -11,6 +11,8 @@ import { Calendar, Clock, MapPin, CheckCircle2, FileText, ExternalLink, Award } 
 import Link from 'next/link';
 import { serializeMongoose } from '@/lib/utils/serialize';
 
+export const dynamic = 'force-dynamic';
+
 export default async function LabourDashboard() {
   const session = await getServerSession(authOptions);
 
