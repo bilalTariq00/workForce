@@ -26,9 +26,15 @@ export default async function LabourDashboard() {
   await connectDB();
 
   // Get employee details
-  const employee = await Employee.findById(session.user.id)
-    .populate('siteId', 'name siteCode address')
-    .lean();
+  let employee;
+  try {
+    employee = await Employee.findById(session.user.id)
+      .populate('siteId', 'name siteCode address')
+      .lean();
+  } catch (error) {
+    console.error('Error fetching employee:', error);
+    redirect('/login');
+  }
 
   if (!employee) {
     redirect('/login');
@@ -66,16 +72,29 @@ export default async function LabourDashboard() {
     .limit(7)
     .lean();
 
-  // Serialize all Mongoose objects
-  const serializedEmployee = serializeMongoose(employee);
-  const serializedAttendance = attendance ? serializeMongoose(attendance) : null;
-  const serializedRecentAttendance = recentAttendance.map(a => serializeMongoose(a));
+  // Serialize all Mongoose objects (already using .lean() so they're plain objects, but serialize for safety)
+  let serializedEmployee, serializedAttendance, serializedRecentAttendance;
+  try {
+    serializedEmployee = employee ? serializeMongoose(employee) : null;
+    serializedAttendance = attendance ? serializeMongoose(attendance) : null;
+    serializedRecentAttendance = recentAttendance ? recentAttendance.map(a => serializeMongoose(a)) : [];
+  } catch (error) {
+    console.error('Error serializing data:', error);
+    // Fallback to plain objects if serialization fails
+    serializedEmployee = employee || null;
+    serializedAttendance = attendance || null;
+    serializedRecentAttendance = recentAttendance || [];
+  }
 
   // Extract site info for easier access (handle both populated and non-populated cases)
-  const siteIdData = serializedEmployee.siteId;
+  const siteIdData = serializedEmployee?.siteId;
   const siteName = (siteIdData && typeof siteIdData === 'object' && siteIdData.name) ? siteIdData.name : null;
   const siteCode = (siteIdData && typeof siteIdData === 'object' && siteIdData.siteCode) ? siteIdData.siteCode : null;
   const siteAddress = (siteIdData && typeof siteIdData === 'object' && siteIdData.address) ? siteIdData.address : null;
+  
+  // Safely extract address fields
+  const addressStreet = siteAddress && typeof siteAddress === 'object' ? siteAddress.street : null;
+  const addressCity = siteAddress && typeof siteAddress === 'object' ? siteAddress.city : null;
 
   return (
     <LabourLayout>
@@ -83,7 +102,7 @@ export default async function LabourDashboard() {
         {/* Welcome Section */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-            Welcome, {serializedEmployee?.firstName || 'User'}!
+            Welcome, {serializedEmployee?.firstName || serializedEmployee?.name || 'User'}!
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Employee ID: {serializedEmployee?.employeeId || 'N/A'} | {siteName ? `Site: ${siteName}` : 'No site assigned'}
@@ -198,9 +217,9 @@ export default async function LabourDashboard() {
               {siteName ? (
                 <div className="space-y-2">
                   <p className="font-medium">{siteName}</p>
-                  {siteAddress && (
+                  {(addressStreet || addressCity) && (
                     <p className="text-sm text-muted-foreground">
-                      {siteAddress.street}, {siteAddress.city}
+                      {[addressStreet, addressCity].filter(Boolean).join(', ')}
                     </p>
                   )}
                   {siteCode && (
