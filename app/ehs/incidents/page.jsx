@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Incident } from '@/lib/models/Incident';
 import IncidentTriageList from '@/components/ehs/IncidentTriageList';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import EHSLayout from '@/components/layouts/EHSLayout';
 
 /**
  * EHS Incident Triage & Investigation Page
@@ -32,18 +32,18 @@ export default async function EHSIncidentsPage() {
   await connectDB();
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">Incident Triage & Investigation</h1>
-          <p className="text-muted-foreground mt-2">
+    <EHSLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Incident Triage & Investigation</h1>
+          <p className="text-sm text-muted-foreground mt-2">
             Review, assign, and investigate safety incidents and near-misses
           </p>
         </div>
 
         <IncidentTriageList />
       </div>
-    </div>
+    </EHSLayout>
   );
 }
 

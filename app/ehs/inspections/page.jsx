@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/db/mongodb';
 import { Inspection } from '@/lib/models/Inspection';
 import { Site } from '@/lib/models/Site';
 import InspectionList from '@/components/ehs/InspectionList';
+import EHSLayout from '@/components/layouts/EHSLayout';
 
 /**
  * EHS Inspection Management Page
@@ -38,18 +39,18 @@ export default async function InspectionsPage({ searchParams }) {
     .lean();
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">Site Inspections</h1>
-          <p className="text-muted-foreground mt-2">
+    <EHSLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Site Inspections</h1>
+          <p className="text-sm text-muted-foreground mt-2">
             Create and manage site inspections, log issues, and track corrective actions
           </p>
         </div>
 
         <InspectionList sites={sites} />
       </div>
-    </div>
+    </EHSLayout>
   );
 }
 
