@@ -87,23 +87,29 @@ export default function MultiSiteDashboardClient() {
   const { sites, totals, lastUpdated } = dashboardData;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Multi-Site Dashboard</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Multi-Site Dashboard</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Real-time overview of all construction sites
             {lastUpdated && (
-              <span className="ml-2">
+              <span className="hidden sm:inline ml-2">
                 • Last updated: {new Date(lastUpdated).toLocaleTimeString()}
               </span>
             )}
           </p>
         </div>
-        <Button onClick={handleRefresh} disabled={refreshing} variant="outline" size="sm">
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+        <Button 
+          onClick={handleRefresh} 
+          disabled={refreshing} 
+          variant="outline" 
+          size="sm"
+          className="w-full sm:w-auto"
+        >
+          <RefreshCw className={`h-4 w-4 sm:mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
 
@@ -123,14 +129,14 @@ export default function MultiSiteDashboardClient() {
       {sites.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">No active sites found</p>
+            <div className="text-center py-8 sm:py-12">
+              <Building2 className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-sm sm:text-base text-muted-foreground mb-4">No active sites found</p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {sites.map((site) => (
             <SiteWidget key={site._id} site={site} />
           ))}

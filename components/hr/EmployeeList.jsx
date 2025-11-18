@@ -86,25 +86,27 @@ export default function EmployeeList({ initialEmployees }) {
         {/* Mobile Card View */}
         <div className="block sm:hidden">
           {employees.map((employee) => (
-            <div key={employee._id} className="p-4 border-b">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 text-sm">
+            <div key={employee._id} className="p-3 sm:p-4 border-b">
+              <div className="flex items-start justify-between mb-2 gap-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900 text-sm truncate">
                     {employee.firstName} {employee.lastName}
                   </h3>
                   <p className="text-xs text-gray-500 mt-1">{employee.employeeId}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-shrink-0">
                   <button
                     onClick={() => handleEdit(employee)}
-                    className="text-blue-600 hover:text-blue-800 p-1"
+                    className="text-blue-600 hover:text-blue-800 p-2 touch-manipulation"
+                    aria-label="Edit employee"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(employee._id)}
                     disabled={deletingId === employee._id}
-                    className="text-red-600 hover:text-red-800 p-1"
+                    className="text-red-600 hover:text-red-800 p-2 touch-manipulation"
+                    aria-label="Delete employee"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

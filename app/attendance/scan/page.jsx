@@ -516,27 +516,27 @@ export default function AttendanceScanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-4 sm:py-8">
       <div className="w-full max-w-md">
         <Card>
-          <CardHeader className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4 mx-auto">
-              <QrCode className="h-8 w-8 text-primary" />
+          <CardHeader className="text-center pb-4 sm:pb-6">
+            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full mb-3 sm:mb-4 mx-auto">
+              <QrCode className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Mark Attendance</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-xl sm:text-2xl">Mark Attendance</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Scan the QR code to mark your attendance for today
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 sm:space-y-6">
             {/* Location Status */}
             <div className="space-y-2">
               {location ? (
-                <div className="flex items-center justify-between text-sm bg-green-50 p-3 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm bg-green-50 p-2 sm:p-3 rounded-lg">
                   <div className="flex items-center gap-2 text-green-700">
-                    <MapPin className="h-4 w-4" />
-                    <span>Location detected</span>
+                    <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="truncate">Location detected</span>
                   </div>
                   <Button
                     type="button"
@@ -544,16 +544,16 @@ export default function AttendanceScanPage() {
                     size="sm"
                     onClick={refreshLocation}
                     disabled={locationLoading}
-                    className="h-7 text-xs"
+                    className="h-8 sm:h-7 text-xs w-full sm:w-auto"
                   >
                     {locationLoading ? 'Refreshing...' : 'Refresh'}
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between text-sm bg-amber-50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-amber-700">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{locationError || 'Requesting location...'}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm bg-amber-50 p-2 sm:p-3 rounded-lg">
+                  <div className="flex items-center gap-2 text-amber-700 min-w-0">
+                    <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="truncate">{locationError || 'Requesting location...'}</span>
                   </div>
                   <Button
                     type="button"
@@ -561,7 +561,7 @@ export default function AttendanceScanPage() {
                     size="sm"
                     onClick={refreshLocation}
                     disabled={locationLoading}
-                    className="h-7 text-xs"
+                    className="h-8 sm:h-7 text-xs w-full sm:w-auto"
                   >
                     {locationLoading ? 'Loading...' : 'Retry'}
                   </Button>
@@ -570,20 +570,20 @@ export default function AttendanceScanPage() {
 
               {/* Show distance to nearest site */}
               {nearestSite && (
-                <div className={`text-sm p-3 rounded-lg ${
+                <div className={`text-xs sm:text-sm p-2 sm:p-3 rounded-lg ${
                   distanceToSite <= nearestSite.attendanceRadius
                     ? 'bg-green-50 text-green-700'
                     : 'bg-red-50 text-red-700'
                 }`}>
-                  <div className="flex items-center justify-between">
-                    <span>
-                      <strong>{nearestSite.name}</strong>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
+                    <span className="font-semibold truncate">
+                      {nearestSite.name}
                     </span>
                     <span>
                       {distanceToSite}m away
                     </span>
                   </div>
-                  <div className="text-xs mt-1">
+                  <div className="text-xs mt-1 sm:mt-1">
                     {distanceToSite <= nearestSite.attendanceRadius ? (
                       <span className="text-green-600">✓ Within range ({nearestSite.attendanceRadius}m radius)</span>
                     ) : (
@@ -598,16 +598,16 @@ export default function AttendanceScanPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-xs sm:text-sm">
                 {error}
               </div>
             )}
 
             {/* Success Message */}
             {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-green-50 border border-green-200 text-green-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-xs sm:text-sm">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" />
+                  <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span>Attendance marked successfully! Redirecting...</span>
                 </div>
               </div>
@@ -617,15 +617,15 @@ export default function AttendanceScanPage() {
             <div className="space-y-4">
               {!showScanner ? (
                 <>
-                  <div className="bg-muted p-6 rounded-lg text-center">
-                    <p className="text-sm font-medium text-foreground mb-2">
+                  <div className="bg-muted p-4 sm:p-6 rounded-lg text-center">
+                    <p className="text-xs sm:text-sm font-medium text-foreground mb-2">
                       Scan the QR code displayed on the laptop/computer at the site
                     </p>
-                    <p className="text-xs text-muted-foreground mb-4">
+                    <p className="text-xs text-muted-foreground mb-3 sm:mb-4">
                       Point your camera at the QR code shown on the screen
                     </p>
-                    <div className="bg-white p-4 rounded-lg inline-block mb-4 border-2 border-dashed border-primary/30">
-                      <QrCode className="h-32 w-32 text-foreground" />
+                    <div className="bg-white p-3 sm:p-4 rounded-lg inline-block mb-3 sm:mb-4 border-2 border-dashed border-primary/30">
+                      <QrCode className="h-24 w-24 sm:h-32 sm:w-32 text-foreground" />
                     </div>
                     <p className="text-xs text-muted-foreground">
                       The QR code should be visible on a laptop or monitor at the site entrance
@@ -635,18 +635,18 @@ export default function AttendanceScanPage() {
                   <Button
                     onClick={startQRScanner}
                     disabled={!location || loading || startingCamera}
-                    className="w-full"
+                    className="w-full min-h-[44px]"
                     variant="outline"
                   >
                     {startingCamera ? (
                       <>
                         <Loader className="h-4 w-4 mr-2 animate-spin" />
-                        Starting Camera...
+                        <span className="text-sm sm:text-base">Starting Camera...</span>
                       </>
                     ) : (
                       <>
                         <Camera className="h-4 w-4 mr-2" />
-                        Open Camera Scanner
+                        <span className="text-sm sm:text-base">Open Camera Scanner</span>
                       </>
                     )}
                   </Button>
@@ -674,7 +674,7 @@ export default function AttendanceScanPage() {
                         value={manualQR}
                         onChange={(e) => setManualQR(e.target.value)}
                         disabled={loading || !location}
-                        className="text-center font-mono text-sm"
+                        className="text-center font-mono text-xs sm:text-sm"
                       />
                       <p className="text-xs text-muted-foreground mt-2 text-center">
                         Enter the QR code data shown on the laptop screen
@@ -683,15 +683,15 @@ export default function AttendanceScanPage() {
                     <Button
                       type="submit"
                       disabled={loading || !location || !manualQR.trim()}
-                      className="w-full"
+                      className="w-full min-h-[44px]"
                     >
                       {loading ? (
                         <>
                           <Loader className="h-4 w-4 mr-2 animate-spin" />
-                          Marking Attendance...
+                          <span className="text-sm sm:text-base">Marking Attendance...</span>
                         </>
                       ) : (
-                        'Mark Attendance'
+                        <span className="text-sm sm:text-base">Mark Attendance</span>
                       )}
                     </Button>
                   </form>

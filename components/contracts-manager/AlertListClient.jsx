@@ -179,12 +179,14 @@ export default function AlertListClient() {
             disabled={generating}
             variant="outline"
             size="sm"
+            className="px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm"
           >
-            <Bell className={`h-4 w-4 mr-2 ${generating ? 'animate-pulse' : ''}`} />
-            {generating ? 'Generating...' : 'Generate Alerts'}
+            <Bell className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 ${generating ? 'animate-pulse' : ''}`} />
+            <span className="hidden sm:inline">{generating ? 'Generating...' : 'Generate Alerts'}</span>
+            <span className="sm:hidden">{generating ? 'Generating...' : 'Generate'}</span>
           </Button>
-          <Button onClick={handleRefresh} disabled={refreshing} variant="outline" size="sm">
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <Button onClick={handleRefresh} disabled={refreshing} variant="outline" size="sm" className="p-2 sm:p-2.5">
+            <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -239,12 +241,12 @@ export default function AlertListClient() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px] text-sm sm:text-base">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -256,7 +258,7 @@ export default function AlertListClient() {
               </Select>
             </div>
             <Select value={severityFilter} onValueChange={setSeverityFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px] text-sm sm:text-base">
                 <SelectValue placeholder="Filter by severity" />
               </SelectTrigger>
               <SelectContent>
@@ -267,7 +269,7 @@ export default function AlertListClient() {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px] text-sm sm:text-base">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>

@@ -61,24 +61,24 @@ export default function DashboardTotals({ totals }) {
   const gridCols = widgets.length > 4 ? 'lg:grid-cols-5' : 'lg:grid-cols-4';
   
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 ${gridCols} gap-4`}>
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${gridCols} gap-3 sm:gap-4`}>
       {widgets.map((widget, index) => {
         const Icon = widget.icon;
         const cardContent = (
           <Card key={index} className={widget.link ? 'hover:shadow-md transition-shadow cursor-pointer' : ''}>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">
+            <CardContent className="pt-4 sm:pt-6">
+              <div className="flex items-center justify-between gap-2 sm:gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1 truncate">
                     {widget.title}
                   </p>
-                  <p className="text-2xl font-bold">{widget.value}</p>
+                  <p className="text-xl sm:text-2xl font-bold truncate">{widget.value}</p>
                   {widget.subtitle && (
-                    <p className="text-xs text-muted-foreground mt-1">{widget.subtitle}</p>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">{widget.subtitle}</p>
                   )}
                 </div>
-                <div className={`${widget.bgColor} p-3 rounded-lg`}>
-                  <Icon className={`h-6 w-6 ${widget.color}`} />
+                <div className={`${widget.bgColor} p-2 sm:p-3 rounded-lg flex-shrink-0`}>
+                  <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${widget.color}`} />
                 </div>
               </div>
             </CardContent>

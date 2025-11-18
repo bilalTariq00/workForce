@@ -8,6 +8,7 @@ import { DailyLog } from '@/lib/models/DailyLog';
 import { PayrollRun } from '@/lib/models/PayrollRun';
 import { Employee } from '@/lib/models/Employee';
 import { Alert } from '@/lib/models/Alert';
+import { Variation } from '@/lib/models/Variation';
 
 /**
  * GET /api/v1/dashboard/multi-site
@@ -141,6 +142,27 @@ export async function GET(req) {
         const activeAlertsCount = await Alert.getActiveCount(site._id);
         const criticalAlertsCount = await Alert.getCriticalCount(site._id);
 
+        // Get variation data for this site
+        const pendingVariations = await Variation.find({
+          siteId: site._id,
+          status: 'pending',
+        }).lean();
+
+        const approvedVariations = await Variation.find({
+          siteId: site._id,
+          status: 'approved',
+        }).lean();
+
+        const totalVariationCost = approvedVariations.reduce(
+          (sum, v) => sum + (v.cost || 0),
+          0
+        );
+
+        const totalVariationDelay = approvedVariations.reduce(
+          (sum, v) => sum + (v.delayDays || 0),
+          0
+        );
+
         return {
           _id: site._id.toString(),
           name: site.name,
@@ -173,6 +195,12 @@ export async function GET(req) {
             spend: {
               total: Math.round(totalSpend * 100) / 100,
               currency: 'GBP',
+            },
+            variations: {
+              pending: pendingVariations.length,
+              approved: approvedVariations.length,
+              totalCost: Math.round(totalVariationCost * 100) / 100,
+              totalDelay: totalVariationDelay,
             },
           },
           alerts: {

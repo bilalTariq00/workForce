@@ -258,12 +258,12 @@ export default function DailyLogForm({ initialData, siteId, siteName }) {
       {/* Main Form Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Daily Site Log - {siteName}</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Daily Site Log - {siteName}</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Fill in the details below. You can save as draft and complete later.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6">
           {/* Weather */}
           <div>
             <label htmlFor="weather" className="block text-sm font-medium text-foreground mb-2">

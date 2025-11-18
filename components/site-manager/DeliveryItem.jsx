@@ -58,11 +58,11 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
 
   return (
     <Card>
-      <CardContent className="pt-4">
-        <div className="space-y-4">
+      <CardContent className="pt-3 sm:pt-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* Header with remove button */}
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-foreground">
+            <h4 className="text-xs sm:text-sm font-medium text-foreground">
               Delivery #{index + 1}
             </h4>
             <Button
@@ -70,9 +70,9 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
               variant="ghost"
               size="sm"
               onClick={onRemove}
-              className="text-red-600 hover:text-red-800"
+              className="text-red-600 hover:text-red-800 p-2 sm:p-2.5"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
 
@@ -80,7 +80,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
           <div>
             <label
               htmlFor={`material-${index}`}
-              className="block text-sm font-medium text-foreground mb-2"
+              className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
             >
               Material Description *
             </label>
@@ -91,7 +91,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
               onChange={(e) => handleChange('material', e.target.value)}
               placeholder="e.g., Concrete, Steel beams, Timber"
               required
-              className="w-full"
+              className="w-full text-sm sm:text-base py-2 sm:py-2.5"
             />
           </div>
 
@@ -99,7 +99,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
           <div>
             <label
               htmlFor={`docket-${index}`}
-              className="block text-sm font-medium text-foreground mb-2"
+              className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
             >
               Docket Number *
             </label>
@@ -110,7 +110,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
               onChange={(e) => handleChange('docketNumber', e.target.value)}
               placeholder="e.g., DOCK-12345"
               required
-              className="w-full"
+              className="w-full text-sm sm:text-base py-2 sm:py-2.5"
             />
           </div>
 
@@ -118,7 +118,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
           <div>
             <label
               htmlFor={`photo-${index}`}
-              className="block text-sm font-medium text-foreground mb-2"
+              className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
             >
               Docket Photo URL *
             </label>
@@ -130,7 +130,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
                 onChange={handlePhotoChange}
                 placeholder="https://example.com/photo.jpg"
                 required
-                className="flex-1"
+                className="flex-1 text-sm sm:text-base py-2 sm:py-2.5"
               />
               <Button
                 type="button"
@@ -138,8 +138,9 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
                 size="icon"
                 title="Upload photo (coming soon)"
                 disabled
+                className="p-2 sm:p-2.5"
               >
-                <Upload className="h-4 w-4" />
+                <Upload className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -151,7 +152,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
           <div>
             <label
               htmlFor={`po-status-${index}`}
-              className="block text-sm font-medium text-foreground mb-2"
+              className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
             >
               PO Match Status
             </label>
@@ -159,7 +160,7 @@ export default function DeliveryItem({ delivery, index, onUpdate, onRemove }) {
               value={localDelivery.poMatchStatus}
               onValueChange={(value) => handleChange('poMatchStatus', value)}
             >
-              <SelectTrigger id={`po-status-${index}`} className="w-full">
+              <SelectTrigger id={`po-status-${index}`} className="w-full text-sm sm:text-base">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -160,11 +160,11 @@ export default function PayrollRunList() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Payroll Runs ({payrollRuns.length})</CardTitle>
-            <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+            <CardTitle className="text-lg sm:text-xl">Payroll Runs ({payrollRuns.length})</CardTitle>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px] text-sm sm:text-base">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -175,7 +175,7 @@ export default function PayrollRunList() {
                   <SelectItem value="paid">Paid</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={() => setIsCreateModalOpen(true)}>
+              <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto text-sm sm:text-base">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Payroll Run
               </Button>
@@ -197,44 +197,44 @@ export default function PayrollRunList() {
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Period</TableHead>
-                    <TableHead>Timesheets</TableHead>
-                    <TableHead>Employees</TableHead>
-                    <TableHead>Total Gross</TableHead>
-                    <TableHead>Total Net</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payrollRuns.map((run) => (
-                    <TableRow key={run._id}>
-                      <TableCell>
-                        <div>
-                          {format(new Date(run.periodStart), 'MMM dd, yyyy')}
-                          <br />
-                          <span className="text-xs text-muted-foreground">to</span>
-                          <br />
-                          {format(new Date(run.periodEnd), 'MMM dd, yyyy')}
+            <>
+              {/* Mobile Card View */}
+              <div className="block md:hidden space-y-3">
+                {payrollRuns.map((run) => (
+                  <Card key={run._id}>
+                    <CardContent className="pt-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-sm">
+                              {format(new Date(run.periodStart), 'MMM dd, yyyy')} - {format(new Date(run.periodEnd), 'MMM dd, yyyy')}
+                            </p>
+                          </div>
+                          {getStatusBadge(run.status)}
                         </div>
-                      </TableCell>
-                      <TableCell>{run.timesheets?.length || 0}</TableCell>
-                      <TableCell>{run.employees?.length || 0}</TableCell>
-                      <TableCell>
-                        £{run.totalGross?.toFixed(2) || '0.00'}
-                      </TableCell>
-                      <TableCell>
-                        £{run.totalNet?.toFixed(2) || '0.00'}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(run.status)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground text-xs">Timesheets:</span>
+                            <p className="font-medium">{run.timesheets?.length || 0}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Employees:</span>
+                            <p className="font-medium">{run.employees?.length || 0}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground text-xs">Gross:</span>
+                            <p className="font-medium">£{run.totalGross?.toFixed(2) || '0.00'}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Net:</span>
+                            <p className="font-medium">£{run.totalNet?.toFixed(2) || '0.00'}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
                           <Link href={`/hr/payroll/${run._id}`}>
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" className="w-full">
                               View
                             </Button>
                           </Link>
@@ -242,6 +242,7 @@ export default function PayrollRunList() {
                             <Button
                               size="sm"
                               onClick={() => handleCalculate(run._id)}
+                              className="w-full"
                             >
                               <Calculator className="h-3 w-3 mr-1" />
                               Calculate
@@ -252,18 +253,88 @@ export default function PayrollRunList() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleExport(run._id, 'csv')}
+                              className="w-full"
                             >
                               <Download className="h-3 w-3 mr-1" />
                               Export CSV
                             </Button>
                           )}
                         </div>
-                      </TableCell>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Timesheets</TableHead>
+                      <TableHead>Employees</TableHead>
+                      <TableHead>Total Gross</TableHead>
+                      <TableHead>Total Net</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollRuns.map((run) => (
+                      <TableRow key={run._id}>
+                        <TableCell>
+                          <div>
+                            {format(new Date(run.periodStart), 'MMM dd, yyyy')}
+                            <br />
+                            <span className="text-xs text-muted-foreground">to</span>
+                            <br />
+                            {format(new Date(run.periodEnd), 'MMM dd, yyyy')}
+                          </div>
+                        </TableCell>
+                        <TableCell>{run.timesheets?.length || 0}</TableCell>
+                        <TableCell>{run.employees?.length || 0}</TableCell>
+                        <TableCell>
+                          £{run.totalGross?.toFixed(2) || '0.00'}
+                        </TableCell>
+                        <TableCell>
+                          £{run.totalNet?.toFixed(2) || '0.00'}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(run.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Link href={`/hr/payroll/${run._id}`}>
+                              <Button size="sm" variant="outline">
+                                View
+                              </Button>
+                            </Link>
+                            {run.status === 'draft' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleCalculate(run._id)}
+                              >
+                                <Calculator className="h-3 w-3 mr-1" />
+                                Calculate
+                              </Button>
+                            )}
+                            {run.status === 'calculated' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleExport(run._id, 'csv')}
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                Export CSV
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

@@ -54,6 +54,39 @@ input::placeholder, textarea::placeholder {
   }
 }
 
+/* Mobile touch-friendly improvements */
+@media (max-width: 768px) {
+  /* Ensure buttons are touch-friendly (minimum 44x44px) */
+  button, a[role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Improve form inputs on mobile */
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px;
+  }
+  
+  /* Better spacing for mobile cards */
+  .card {
+    @apply p-4;
+  }
+  
+  /* Improve table scrolling on mobile */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Better text wrapping */
+  h1, h2, h3, h4, h5, h6 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
 
 
 @layer base {

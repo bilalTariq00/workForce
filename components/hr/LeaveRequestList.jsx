@@ -127,10 +127,10 @@ export default function LeaveRequestList() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Leave Requests ({leaveRequests.length})</CardTitle>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+            <CardTitle className="text-lg sm:text-xl">Leave Requests ({leaveRequests.length})</CardTitle>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px] text-sm sm:text-base">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -149,64 +149,132 @@ export default function LeaveRequestList() {
               <p>No leave requests found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Days</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leaveRequests.map((request) => (
-                    <TableRow key={request._id}>
-                      <TableCell>
-                        {request.employeeId?.firstName} {request.employeeId?.lastName}
-                        <br />
-                        <span className="text-xs text-muted-foreground">
-                          {request.employeeId?.employeeId}
-                        </span>
-                      </TableCell>
-                      <TableCell>{getTypeLabel(request.type)}</TableCell>
-                      <TableCell>
-                        {format(new Date(request.startDate), 'MMM dd, yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(request.endDate), 'MMM dd, yyyy')}
-                      </TableCell>
-                      <TableCell>{request.days} days</TableCell>
-                      <TableCell>{getStatusBadge(request.status)}</TableCell>
-                      <TableCell>
+            <>
+              {/* Mobile Card View */}
+              <div className="block md:hidden space-y-3">
+                {leaveRequests.map((request) => (
+                  <Card key={request._id}>
+                    <CardContent className="pt-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-sm">
+                              {request.employeeId?.firstName} {request.employeeId?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {request.employeeId?.employeeId}
+                            </p>
+                          </div>
+                          {getStatusBadge(request.status)}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground text-xs">Type:</span>
+                            <p className="font-medium">{getTypeLabel(request.type)}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Days:</span>
+                            <p className="font-medium">{request.days} days</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground text-xs">Start:</span>
+                            <p className="font-medium">
+                              {format(new Date(request.startDate), 'MMM dd, yyyy')}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">End:</span>
+                            <p className="font-medium">
+                              {format(new Date(request.endDate), 'MMM dd, yyyy')}
+                            </p>
+                          </div>
+                        </div>
                         {request.status === 'pending' && (
                           <Button
                             size="sm"
                             onClick={() => handleApprove(request)}
+                            className="w-full"
                           >
                             Review
                           </Button>
                         )}
-                        {request.status !== 'pending' && (
-                          <span className="text-xs text-muted-foreground">
-                            {request.approvedBy
-                              ? `By ${request.approvedBy.firstName} ${request.approvedBy.lastName}`
-                              : 'N/A'}
-                            <br />
-                            {request.approvedAt
-                              ? format(new Date(request.approvedAt), 'MMM dd, yyyy')
-                              : ''}
-                          </span>
+                        {request.status !== 'pending' && request.approvedBy && (
+                          <div className="text-xs text-muted-foreground">
+                            {request.status === 'approved' ? 'Approved' : 'Rejected'} by{' '}
+                            {request.approvedBy.firstName} {request.approvedBy.lastName}
+                            {request.approvedAt && (
+                              <> on {format(new Date(request.approvedAt), 'MMM dd, yyyy')}</>
+                            )}
+                          </div>
                         )}
-                      </TableCell>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Days</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {leaveRequests.map((request) => (
+                      <TableRow key={request._id}>
+                        <TableCell>
+                          {request.employeeId?.firstName} {request.employeeId?.lastName}
+                          <br />
+                          <span className="text-xs text-muted-foreground">
+                            {request.employeeId?.employeeId}
+                          </span>
+                        </TableCell>
+                        <TableCell>{getTypeLabel(request.type)}</TableCell>
+                        <TableCell>
+                          {format(new Date(request.startDate), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(request.endDate), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell>{request.days} days</TableCell>
+                        <TableCell>{getStatusBadge(request.status)}</TableCell>
+                        <TableCell>
+                          {request.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleApprove(request)}
+                            >
+                              Review
+                            </Button>
+                          )}
+                          {request.status !== 'pending' && (
+                            <span className="text-xs text-muted-foreground">
+                              {request.approvedBy
+                                ? `By ${request.approvedBy.firstName} ${request.approvedBy.lastName}`
+                                : 'N/A'}
+                              <br />
+                              {request.approvedAt
+                                ? format(new Date(request.approvedAt), 'MMM dd, yyyy')
+                                : ''}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

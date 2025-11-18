@@ -1,498 +1,378 @@
-# Complete Testing Guide
+# 🧪 Complete Testing Guide
 
-## 🧪 How to Test All Completed Features
+## 🚀 Quick Start Testing
 
-This guide provides step-by-step instructions to test all 11 completed use cases.
+### Step 1: Check Environment Setup
 
----
+Make sure you have a `.env.local` file with these variables:
 
-## 📋 Prerequisites
+```env
+# MongoDB Connection
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/workforce?retryWrites=true&w=majority
 
-### 1. Start the Development Server
+# NextAuth Configuration
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-key-here
+
+# Default HR Admin
+DEFAULT_HR_EMAIL=hr@workforce.com
+DEFAULT_HR_PASSWORD=Admin@123
+
+# Cloudinary (for file uploads)
+CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+```
+
+### Step 2: Start the Server
+
+The dev server should be running at `http://localhost:3000`
+
+If not, run:
 ```bash
-cd /Users/nc/Desktop/workforce
 npm run dev
 ```
 
-### 2. Access the Application
-- Open browser: `http://localhost:3000`
-- You'll be redirected to `/login` if not authenticated
+### Step 3: Initialize HR Admin
 
-### 3. Initialize Test Data (First Time Only)
 Visit: `http://localhost:3000/api/v1/init`
-- This creates default HR admin user
-- Email: `hr@workforce.com`
-- Password: `Admin@123`
+
+This creates the default HR admin user.
 
 ---
 
-## 👥 Test User Setup
+## 📋 Complete Feature Testing Checklist
 
-### Step 1: Login as HR Admin
-1. Go to `/login`
-2. Email: `hr@workforce.com`
-3. Password: `Admin@123`
-4. Click "Sign In"
-5. You'll be redirected to `/hr/dashboard`
+### 🔐 Authentication & Login
 
-### Step 2: Create Test Users
+#### Test 1: HR Admin Login
+- [ ] Go to `/login`
+- [ ] Login with: `hr@workforce.com` / `Admin@123`
+- [ ] Should redirect to HR dashboard
+- [ ] Check mobile responsiveness (resize browser)
 
-#### A. Create a Site Manager
-1. Navigate to `/hr/create-employee` or click "Create Employee"
-2. Fill in:
-   - **First Name:** John
-   - **Last Name:** Smith
-   - **Email:** `sitemanager@workforce.com`
-   - **Phone:** `+441234567890`
-   - **Role:** Site Manager
-   - **Password:** `SiteManager123`
-   - **Pay Rate:** `15.00`
-3. Click "Create Employee"
-4. **Important:** Go to `/hr/employees`, find John Smith, click Edit, and assign a Site
-
-#### B. Create a Contracts Manager
-1. Navigate to `/hr/create-employee`
-2. Fill in:
-   - **First Name:** Sarah
-   - **Last Name:** Johnson
-   - **Email:** `contractsmanager@workforce.com`
-   - **Phone:** `+441234567891`
-   - **Role:** Contracts Manager
-   - **Password:** `ContractsManager123`
-   - **Pay Rate:** `25.00`
-3. Click "Create Employee"
-
-#### C. Create a Labour Worker
-1. Navigate to `/hr/create-employee`
-2. Fill in:
-   - **First Name:** Mike
-   - **Last Name:** Brown
-   - **Email:** `labour@workforce.com`
-   - **Phone:** `+441234567892`
-   - **Role:** Labour
-   - **Password:** `Labour123`
-   - **Pay Rate:** `12.00`
-3. Click "Create Employee"
-4. **Important:** Go to `/hr/employees`, find Mike Brown, click Edit, and assign a Site
-
-#### D. Create a Site (if needed)
-1. Navigate to `/hr/sites`
-2. Click "Create Site"
-3. Fill in:
-   - **Site Code:** `SITE-001`
-   - **Name:** `Construction Site A`
-   - **Street:** `123 Main Street`
-   - **City:** `London`
-   - **Postcode:** `SW1A 1AA`
-   - **Latitude:** `51.5074`
-   - **Longitude:** `-0.1278`
-   - **Contracts Manager:** Select Sarah Johnson
-4. Click "Create Site"
-5. **Assign Site Manager:** Go to `/hr/employees`, edit John Smith, assign to "Construction Site A"
+#### Test 2: Employee Login
+- [ ] Create an employee first (see HR tests below)
+- [ ] Logout
+- [ ] Login with employee credentials
+- [ ] Should redirect to appropriate dashboard based on role
 
 ---
 
-## ✅ Test Checklist
+### 👥 HR Module Testing
 
-### 1. LB-01: Site Sign-In/Sign-Out
+#### HR-01: Employee Onboarding
+- [ ] Go to `/hr/employees`
+- [ ] Click "Create Employee"
+- [ ] Fill form:
+  - First Name: "John"
+  - Last Name: "Doe"
+  - Email: "john.doe@test.com"
+  - Phone: "+1234567890"
+  - Role: "labour" (or "site_manager", "contracts_manager")
+  - Password: "Test123!"
+  - Pay Rate: "25.00"
+- [ ] Submit form
+- [ ] Verify employee appears in list
+- [ ] Test mobile view (resize browser)
 
-**Test as:** Labour Worker (Mike Brown)
+#### HR-02: Profile Maintenance
+- [ ] Go to `/hr/employees`
+- [ ] Click "Edit" on an employee
+- [ ] Update phone number or pay rate
+- [ ] Save changes
+- [ ] Verify changes saved
 
-#### Test Sign-In:
-1. Logout (if logged in as HR)
-2. Go to `/login`
-3. Login as:
-   - Email: `labour@workforce.com`
-   - Password: `Labour123`
-4. You'll be redirected to `/attendance/scan`
-5. **Test QR Code Scan:**
-   - Click "Scan QR Code" button
-   - Allow camera permission
-   - Scan the QR code displayed at `/hr/qr-display`
-   - Should show "Sign In Successful"
-   - Should redirect to `/dashboard`
+#### HR-03: Leave Balance Management (Automatic)
+- [ ] This is automatic - no manual testing needed
+- [ ] System updates balances when leave is approved/rejected
 
-#### Test Sign-Out:
-1. On dashboard, click "Sign Out" button
-2. Should mark attendance as signed out
-3. Should show sign-out time
+#### HR-04: Timesheet Approval
+- [ ] Go to `/hr/timesheets`
+- [ ] Click "Generate All" to create timesheets
+- [ ] View a timesheet
+- [ ] Approve or reject
+- [ ] Test mobile card view
 
-**Expected Results:**
-- ✅ QR code scan works
-- ✅ Geolocation validation works
-- ✅ Sign-in time recorded
-- ✅ Sign-out time recorded
-- ✅ Attendance visible in system
+#### HR-05: Payroll Run & Export
+- [ ] Go to `/hr/payroll`
+- [ ] Click "Create Payroll Run"
+- [ ] Select period dates
+- [ ] Create run
+- [ ] Click "Calculate" on draft run
+- [ ] Click "Export CSV" on calculated run
+- [ ] Verify CSV downloads
 
----
-
-### 2. SM-01: Daily Site Log
-
-**Test as:** Site Manager (John Smith)
-
-#### Test Create Daily Log:
-1. Logout and login as:
-   - Email: `sitemanager@workforce.com`
-   - Password: `SiteManager123`
-2. Navigate to `/site-manager/dashboard`
-3. Click "Create Daily Log" or go to `/site-manager/daily-logs`
-4. Fill in:
-   - **Date:** Today's date
-   - **Weather:** `Sunny`
-   - **Headcount:** `25`
-   - **Planned Headcount:** `30`
-   - **Deliveries:** Click "Add Delivery"
-     - Material: `Concrete`
-     - Docket Number: `DOCK-001`
-     - Docket Photo: `https://example.com/photo.jpg`
-   - **Issues:** `No issues today`
-5. Click "Save" (saves as draft)
-
-#### Test Edit Daily Log:
-1. Find the log you just created
-2. Click "Edit"
-3. Update headcount to `28`
-4. Click "Save"
-
-#### Test Lock Daily Log:
-1. Find the log
-2. Click "Lock"
-3. Should change status to "locked"
-4. Should not be editable anymore
-
-#### Test Send to Contracts Manager:
-1. Click "Send to CM"
-2. Should change status to "sent"
-3. Should be visible to Contracts Manager
-
-**Expected Results:**
-- ✅ Can create daily log
-- ✅ Can edit draft logs
-- ✅ Can lock log
-- ✅ Can send to Contracts Manager
-- ✅ Cannot edit locked/sent logs
+#### HR-06: Certification Tracking
+- [ ] Go to `/hr/certifications`
+- [ ] View all certifications
+- [ ] Click "Validate" on pending certification
+- [ ] Approve or reject
+- [ ] Test mobile view
 
 ---
 
-### 3. SM-02: Workforce Attendance Verification
+### 👷 Labour/Tradesperson Module Testing
 
-**Test as:** Site Manager (John Smith)
+#### LB-01: Site Sign-In/Sign-Out
+- [ ] Login as labour employee
+- [ ] Go to `/attendance/scan`
+- [ ] Test QR code scanner (or manual entry)
+- [ ] Sign in to a site
+- [ ] Verify attendance recorded
+- [ ] Sign out
+- [ ] Test mobile view
 
-#### Test Attendance Verification:
-1. Login as Site Manager
-2. Navigate to `/site-manager/attendance-verification`
-3. Select a site (if multiple)
-4. Select a date (today)
-5. Click "Verify Attendance"
+#### LB-03: Leave Request
+- [ ] Go to `/attendance/leave-request`
+- [ ] Fill leave request form:
+  - Type: "Annual Leave"
+  - Start Date: Future date
+  - End Date: Future date
+  - Reason: "Vacation"
+- [ ] Submit
+- [ ] Verify request appears in HR dashboard
+- [ ] Test mobile view
 
-**Expected Results:**
-- ✅ Shows planned headcount
-- ✅ Shows actual headcount
-- ✅ Shows attendance percentage
-- ✅ Lists present employees
-- ✅ Lists missing employees
-- ✅ Shows status (good/warning/critical)
-
----
-
-### 4. SM-03: Material Receipt & PO Auto-Matching
-
-**Test as:** Site Manager (John Smith)
-
-#### Test PO Auto-Matching:
-1. First, create a Purchase Order (via API or database):
-   ```javascript
-   // In MongoDB or via API
-   {
-     poNumber: "PO-001",
-     material: "Concrete",
-     siteId: <site_id>,
-     status: "pending"
-   }
-   ```
-
-2. Create a daily log with delivery:
-   - Material: `Concrete`
-   - Docket Number: `PO-001-DOCK-123`
-   - The system should auto-match to PO-001
-
-**Expected Results:**
-- ✅ Delivery auto-matches to PO
-- ✅ PO match status shows "matched"
-- ✅ PO ID linked to delivery
+#### LB-06: Certification Upload
+- [ ] Go to `/attendance/certifications`
+- [ ] Click "Upload Certification"
+- [ ] Fill form:
+  - Type: "SafePass" or "CSCS"
+  - Issue Date: Past date
+  - Expiry Date: Future date
+  - Upload document (PDF/JPG/PNG)
+- [ ] Submit
+- [ ] Verify upload successful
+- [ ] Check document URL (should be Cloudinary or local)
+- [ ] Test mobile view
 
 ---
 
-### 5. HR-01: Employee On-boarding
+### 🏗️ Site Manager Module Testing
 
-**Test as:** HR Officer
+#### SM-01: Daily Site Log
+- [ ] Login as site manager
+- [ ] Go to `/site-manager/daily-logs`
+- [ ] Click "Create Daily Log"
+- [ ] Fill form:
+  - Weather: "Sunny"
+  - Headcount: "25"
+  - Add delivery (material, docket number, photo URL)
+  - Issues: "No issues"
+- [ ] Submit
+- [ ] Verify log appears in list
+- [ ] Test mobile view
 
-#### Test Create Employee:
-1. Login as HR (`hr@workforce.com` / `Admin@123`)
-2. Navigate to `/hr/create-employee`
-3. Fill in employee details:
-   - First Name, Last Name, Email, Phone
-   - Role: Select any role
-   - Password: Set password
-   - Pay Rate: Enter amount
-4. Click "Create Employee"
+#### SM-02: Attendance Verification
+- [ ] Go to `/site-manager/attendance-verification`
+- [ ] View planned vs actual attendance
+- [ ] Flag missing workers if needed
+- [ ] Test mobile view
 
-**Expected Results:**
-- ✅ Employee created successfully
-- ✅ Employee appears in `/hr/employees`
-- ✅ Can login with created credentials
+#### SM-03: Material Receipt & Docket Match
+- [ ] This is part of Daily Log
+- [ ] Add delivery in daily log
+- [ ] Set PO match status
+- [ ] Verify delivery appears
 
----
-
-### 6. HR-02: Profile Maintenance
-
-**Test as:** HR Officer
-
-#### Test Edit Employee:
-1. Navigate to `/hr/employees`
-2. Find an employee
-3. Click "Edit" (pencil icon)
-4. Update:
-   - Phone number
-   - Pay rate
-   - Site assignment
-   - Bank details
-5. Click "Save"
-
-**Expected Results:**
-- ✅ Employee details updated
-- ✅ Changes reflected immediately
-- ✅ Can update all fields
+#### SM-06: Variation/Change Order
+- [ ] Go to `/site-manager/variations`
+- [ ] Click "Create Variation"
+- [ ] Fill form:
+  - Title: "Additional Foundation Work"
+  - Description: "Extra foundation required"
+  - Cost: "5000"
+  - Delay Days: "3"
+- [ ] Save as draft
+- [ ] Click "Submit" to send for approval
+- [ ] Test mobile view
 
 ---
 
-### 7. HR-03: Leave Balance Management
+### 📊 Contracts Manager Module Testing
 
-**Test as:** HR Officer (automatic on approval)
+#### CM-01: Multi-Site Dashboard
+- [ ] Login as contracts manager
+- [ ] Go to `/contracts-manager/dashboard`
+- [ ] View all sites
+- [ ] Check widgets show:
+  - Headcount
+  - Progress %
+  - Incidents
+  - Spend
+- [ ] Click on a site to view details
+- [ ] Test mobile view
 
-#### Test Leave Balance:
-1. First, create a leave request (see LB-03 test)
-2. Approve the leave request
-3. Check employee's leave balance:
-   - Go to `/hr/employees`
-   - Find the employee
-   - View their profile
-   - Check `annualLeaveBalance` field
+#### CM-02: Resource Re-Allocation
+- [ ] Go to `/contracts-manager/resource-allocation`
+- [ ] Click "Create Reallocation"
+- [ ] Fill form:
+  - From Site: Select site
+  - To Site: Select another site
+  - Resource Type: "crew" or "plant"
+  - Select employees or plant
+  - Reason: "Resource needed"
+- [ ] Submit
+- [ ] Approve the request
+- [ ] Test mobile view
 
-**Expected Results:**
-- ✅ Leave balance auto-updates on approval
-- ✅ Balance decreases by number of days
-- ✅ Balance tracked correctly
+#### CM-03: Exception Alert Review
+- [ ] Go to `/contracts-manager/alerts`
+- [ ] View alerts
+- [ ] Click "Generate Alerts" to create alerts
+- [ ] Acknowledge or resolve alerts
+- [ ] Test filters (status, severity, type)
+- [ ] Test mobile view
 
----
-
-### 8. HR-04: Timesheet Approval
-
-**Test as:** HR Officer
-
-#### Test Generate Timesheets:
-1. Login as HR
-2. Navigate to `/hr/timesheets`
-3. Click "Generate All"
-4. Should create timesheets for all employees with attendance
-
-#### Test View Timesheet:
-1. Find a timesheet in the list
-2. Click "View"
-3. Should show:
-   - Employee details
-   - Daily breakdown (Monday-Sunday)
-   - Total hours
-   - Status
-
-#### Test Approve Timesheet:
-1. Open a timesheet
-2. Click "Approve Timesheet"
-3. Optionally add approval notes
-4. Click "Approve"
-
-#### Test Lock Timesheet:
-1. After approval, click "Lock for Payroll"
-2. Should change status to "locked"
-3. Cannot be edited after locking
-
-**Expected Results:**
-- ✅ Can generate timesheets
-- ✅ Timesheets show correct hours
-- ✅ Can approve timesheets
-- ✅ Can lock timesheets
-- ✅ Locked timesheets cannot be edited
+#### CM-04: Variation Approval
+- [ ] Go to `/contracts-manager/variations`
+- [ ] View pending variations
+- [ ] Click "Review" on a pending variation
+- [ ] Approve or reject
+- [ ] Add commercial notes if approving
+- [ ] Test mobile view
 
 ---
 
-### 9. HR-05: Payroll Run & Export
+### 🛡️ EHS Module Testing
 
-**Test as:** HR Officer
+#### EHS-01: Incident Triage & Investigation
+- [ ] Login as EHS officer (or labour/site manager)
+- [ ] Go to `/attendance/incidents` (to report)
+- [ ] Click "Report New Incident"
+- [ ] Fill form:
+  - Type: "Injury" or "Near Miss"
+  - Severity: "Minor" or "Major"
+  - Description: "Test incident"
+  - Location: "Site A"
+  - Upload photo (optional)
+- [ ] Submit
+- [ ] Login as EHS officer
+- [ ] Go to `/ehs/incidents`
+- [ ] View incident
+- [ ] Assign to EHS officer
+- [ ] Add corrective actions
+- [ ] Change status (investigating → resolved → closed)
+- [ ] Test mobile view
 
-#### Test Create Payroll Run:
-1. Navigate to `/hr/payroll`
-2. Click "Create Payroll Run"
-3. Fill in:
-   - **Period Start:** Start of current month
-   - **Period End:** End of current month
-4. Select locked timesheets
-5. Click "Create"
+#### EHS-02: Site Inspection & Checklist
+- [ ] Go to `/ehs/inspections`
+- [ ] Click "Create Inspection"
+- [ ] Fill form:
+  - Site: Select site
+  - Inspector: Select EHS officer
+  - Date: Today
+  - Add checklist items
+- [ ] Submit
+- [ ] View inspection
+- [ ] Add issues
+- [ ] Mark issues as resolved
+- [ ] Complete inspection
+- [ ] Test mobile view
 
-#### Test Calculate Payroll:
-1. Open the payroll run
-2. Click "Calculate Payroll"
-3. Should calculate:
-   - Gross pay
-   - Tax
-   - Net pay
-   - Totals
-
-#### Test Export to Sage:
-1. After calculation, click "Export to Sage"
-2. Select format (CSV or JSON)
-3. Click "Export"
-4. Should download file
-
-**Expected Results:**
-- ✅ Can create payroll run
-- ✅ Can calculate payroll
-- ✅ Calculations are correct
-- ✅ Can export to Sage
-- ✅ Export file is valid
-
----
-
-### 10. LB-03: Leave Request
-
-**Test as:** Labour Worker (Mike Brown)
-
-#### Test Create Leave Request:
-1. Login as labour worker
-2. Navigate to `/attendance/leave-request`
-3. Fill in:
-   - **Leave Type:** Annual
-   - **Start Date:** Select future date
-   - **End Date:** Select end date
-   - **Reason:** `Family vacation`
-4. Should auto-calculate days (excluding weekends)
-5. Click "Submit Leave Request"
-
-#### Test Approve Leave Request:
-1. Logout and login as HR
-2. Navigate to `/hr/leave-requests`
-3. Find the pending request
-4. Click "Approve" or "Reject"
-5. If approve, check employee's leave balance
-
-**Expected Results:**
-- ✅ Can create leave request
-- ✅ Days calculated correctly (excluding weekends)
-- ✅ Can approve/reject
-- ✅ Leave balance updates on approval
+#### EHS-03: Training Register
+- [ ] Go to `/ehs/training`
+- [ ] Click "Assign Training"
+- [ ] Fill form:
+  - Employee: Select employee
+  - Type: "Safety Training"
+  - Due Date: Future date
+  - Expiry Date: Future date
+- [ ] Submit
+- [ ] View training records
+- [ ] Filter by status (pending, completed, overdue)
+- [ ] Test mobile view
 
 ---
 
-### 11. CM-01: Multi-Site Dashboard
+## 📱 Mobile Responsiveness Testing
 
-**Test as:** Contracts Manager (Sarah Johnson)
+### Test on Different Screen Sizes
 
-#### Test Dashboard:
-1. Login as Contracts Manager
-2. Should redirect to `/contracts-manager/dashboard`
-3. Should see:
-   - Dashboard totals (headcount, progress, incidents, spend)
-   - Site widgets grid
-   - Each site showing:
-     - Headcount (current/planned)
-     - Progress %
-     - Incidents count
-     - Spend
+1. **Mobile (375px - 640px)**
+   - [ ] Sidebar should be hidden (hamburger menu)
+   - [ ] Tables should show as cards
+   - [ ] Buttons should be touch-friendly (min 44px height)
+   - [ ] Forms should stack vertically
+   - [ ] Text should be readable (min 14px)
 
-#### Test Refresh:
-1. Click "Refresh" button
-2. Should update data
+2. **Tablet (641px - 1024px)**
+   - [ ] Sidebar can be toggled
+   - [ ] Grid layouts should be 2 columns
+   - [ ] Forms can be 2 columns where appropriate
 
-#### Test Site Widget:
-1. Click on a site widget
-2. Should show detailed information
-3. Check alert indicators (if any)
+3. **Desktop (1025px+)**
+   - [ ] Full sidebar visible
+   - [ ] Tables visible
+   - [ ] Multi-column layouts
 
-**Expected Results:**
-- ✅ Dashboard loads with all sites
-- ✅ Widgets show correct data
-- ✅ Totals are accurate
-- ✅ Refresh works
-- ✅ Alerts display correctly
-
----
-
-## 🔍 Quick Test Script
-
-### Run All Tests in Sequence:
-
-```bash
-# 1. Start server
-npm run dev
-
-# 2. Initialize (first time only)
-# Visit: http://localhost:3000/api/v1/init
-
-# 3. Test Flow:
-# - Login as HR → Create test users → Create site → Assign users
-# - Login as Labour → Test sign-in/sign-out → Test leave request
-# - Login as Site Manager → Test daily log → Test attendance verification
-# - Login as HR → Test timesheet approval → Test payroll
-# - Login as Contracts Manager → Test dashboard
-```
+### Test These Pages on Mobile:
+- [ ] `/login`
+- [ ] `/attendance/scan`
+- [ ] `/attendance/leave-request`
+- [ ] `/attendance/certifications`
+- [ ] `/hr/employees`
+- [ ] `/hr/timesheets`
+- [ ] `/hr/payroll`
+- [ ] `/site-manager/daily-logs`
+- [ ] `/site-manager/variations`
+- [ ] `/contracts-manager/dashboard`
+- [ ] `/contracts-manager/variations`
+- [ ] `/contracts-manager/alerts`
+- [ ] `/ehs/incidents`
+- [ ] `/ehs/inspections`
+- [ ] `/ehs/training`
 
 ---
 
-## 🐛 Common Issues & Solutions
+## 🔍 Common Issues & Fixes
 
-### Issue: "Employee not found"
-**Solution:** Make sure employee exists and is active
+### Issue: "Cannot connect to MongoDB"
+**Fix:** Check `MONGODB_URI` in `.env.local`
 
-### Issue: "Site not assigned"
-**Solution:** HR needs to assign site to employee
+### Issue: "NextAuth error"
+**Fix:** Check `NEXTAUTH_SECRET` and `NEXTAUTH_URL` in `.env.local`
 
-### Issue: "Cannot create daily log"
-**Solution:** Check if log already exists for that date
+### Issue: "File upload not working"
+**Fix:** Check `CLOUDINARY_URL` in `.env.local` or ensure `public/uploads` directory exists
 
-### Issue: "Timesheet not generating"
-**Solution:** Make sure employee has attendance records
+### Issue: "404 on routes"
+**Fix:** Make sure server is running and routes exist
 
-### Issue: "Dashboard shows no data"
-**Solution:** Make sure sites exist and are active
-
----
-
-## 📊 Test Results Template
-
-Use this to track your testing:
-
-```
-✅ LB-01: Site Sign-In/Sign-Out - [PASS/FAIL]
-✅ SM-01: Daily Site Log - [PASS/FAIL]
-✅ SM-02: Workforce Attendance Verification - [PASS/FAIL]
-✅ SM-03: Material Receipt & PO Auto-Matching - [PASS/FAIL]
-✅ HR-01: Employee On-boarding - [PASS/FAIL]
-✅ HR-02: Profile Maintenance - [PASS/FAIL]
-✅ HR-03: Leave Balance Management - [PASS/FAIL]
-✅ HR-04: Timesheet Approval - [PASS/FAIL]
-✅ HR-05: Payroll Run & Export - [PASS/FAIL]
-✅ LB-03: Leave Request - [PASS/FAIL]
-✅ CM-01: Multi-Site Dashboard - [PASS/FAIL]
-```
+### Issue: "Mobile view not responsive"
+**Fix:** Clear browser cache and hard refresh (Cmd+Shift+R / Ctrl+Shift+R)
 
 ---
 
-## 🎯 Next Steps After Testing
+## ✅ Final Checklist
 
-1. **Fix any bugs found**
-2. **Document issues**
-3. **Proceed with CM-03: Exception Alert Review**
+Before considering testing complete:
+
+- [ ] All HR features work
+- [ ] All Labour features work
+- [ ] All Site Manager features work
+- [ ] All Contracts Manager features work
+- [ ] All EHS features work
+- [ ] Mobile responsiveness verified on all pages
+- [ ] File uploads work (certifications, incident photos)
+- [ ] Authentication works for all roles
+- [ ] Dashboards load correctly
+- [ ] Forms validate correctly
+- [ ] Alerts generate correctly
+- [ ] No console errors in browser
+- [ ] No server errors in terminal
 
 ---
 
-**Happy Testing! 🚀**
+## 🐛 Reporting Issues
 
+If you find issues:
+
+1. Check browser console for errors
+2. Check server terminal for errors
+3. Note the exact steps to reproduce
+4. Note your role and the page you're on
+5. Check if it's a mobile-specific issue
+
+---
+
+**Happy Testing! 🎉**

@@ -180,12 +180,12 @@ export default function TimesheetListClient() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px] text-sm sm:text-base">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,14 +197,14 @@ export default function TimesheetListClient() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
                 value={weekFilter}
                 onChange={(e) => setWeekFilter(e.target.value)}
                 placeholder="Filter by week"
-                className="w-auto"
+                className="w-full sm:w-auto text-sm sm:text-base"
               />
             </div>
           </div>
@@ -233,52 +233,99 @@ export default function TimesheetListClient() {
               <Button onClick={handleGenerate}>Generate Timesheets</Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Week</TableHead>
-                    <TableHead>Total Hours</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Approved By</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {timesheets.map((timesheet) => (
-                    <TableRow key={timesheet._id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">
-                            {timesheet.employeeId?.firstName} {timesheet.employeeId?.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {timesheet.employeeId?.employeeId}
-                          </p>
+            <>
+              {/* Mobile Card View */}
+              <div className="block md:hidden space-y-3">
+                {timesheets.map((timesheet) => (
+                  <Card key={timesheet._id}>
+                    <CardContent className="pt-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-sm">
+                              {timesheet.employeeId?.firstName} {timesheet.employeeId?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {timesheet.employeeId?.employeeId}
+                            </p>
+                          </div>
+                          {getStatusBadge(timesheet.status)}
                         </div>
-                      </TableCell>
-                      <TableCell>{formatWeek(timesheet.weekStartDate)}</TableCell>
-                      <TableCell className="font-semibold">{timesheet.totalHours}h</TableCell>
-                      <TableCell>{getStatusBadge(timesheet.status)}</TableCell>
-                      <TableCell>
-                        {timesheet.approvedBy
-                          ? `${timesheet.approvedBy.firstName} ${timesheet.approvedBy.lastName}`
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground text-xs">Week:</span>
+                            <p className="font-medium">{formatWeek(timesheet.weekStartDate)}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">Hours:</span>
+                            <p className="font-semibold">{timesheet.totalHours}h</p>
+                          </div>
+                        </div>
+                        {timesheet.approvedBy && (
+                          <div className="text-xs text-muted-foreground">
+                            Approved by: {timesheet.approvedBy.firstName} {timesheet.approvedBy.lastName}
+                          </div>
+                        )}
                         <Link href={`/hr/timesheets/${timesheet._id}`}>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" className="w-full">
                             <Eye className="h-4 w-4 mr-2" />
                             View
                           </Button>
                         </Link>
-                      </TableCell>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Week</TableHead>
+                      <TableHead>Total Hours</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Approved By</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {timesheets.map((timesheet) => (
+                      <TableRow key={timesheet._id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">
+                              {timesheet.employeeId?.firstName} {timesheet.employeeId?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {timesheet.employeeId?.employeeId}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatWeek(timesheet.weekStartDate)}</TableCell>
+                        <TableCell className="font-semibold">{timesheet.totalHours}h</TableCell>
+                        <TableCell>{getStatusBadge(timesheet.status)}</TableCell>
+                        <TableCell>
+                          {timesheet.approvedBy
+                            ? `${timesheet.approvedBy.firstName} ${timesheet.approvedBy.lastName}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Link href={`/hr/timesheets/${timesheet._id}`}>
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

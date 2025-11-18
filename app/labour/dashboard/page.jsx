@@ -71,10 +71,11 @@ export default async function LabourDashboard() {
   const serializedAttendance = attendance ? serializeMongoose(attendance) : null;
   const serializedRecentAttendance = recentAttendance.map(a => serializeMongoose(a));
 
-  // Extract site info for easier access
-  const siteName = serializedEmployee.siteId?.name || null;
-  const siteCode = serializedEmployee.siteId?.siteCode || null;
-  const siteAddress = serializedEmployee.siteId?.address || null;
+  // Extract site info for easier access (handle both populated and non-populated cases)
+  const siteIdData = serializedEmployee.siteId;
+  const siteName = (siteIdData && typeof siteIdData === 'object' && siteIdData.name) ? siteIdData.name : null;
+  const siteCode = (siteIdData && typeof siteIdData === 'object' && siteIdData.siteCode) ? siteIdData.siteCode : null;
+  const siteAddress = (siteIdData && typeof siteIdData === 'object' && siteIdData.address) ? siteIdData.address : null;
 
   return (
     <LabourLayout>
@@ -82,10 +83,10 @@ export default async function LabourDashboard() {
         {/* Welcome Section */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-            Welcome, {serializedEmployee.firstName}!
+            Welcome, {serializedEmployee?.firstName || 'User'}!
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Employee ID: {serializedEmployee.employeeId} | {siteName ? `Site: ${siteName}` : 'No site assigned'}
+            Employee ID: {serializedEmployee?.employeeId || 'N/A'} | {siteName ? `Site: ${siteName}` : 'No site assigned'}
           </p>
         </div>
 
@@ -108,12 +109,14 @@ export default async function LabourDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Site</p>
-                    <p className="font-medium">{serializedAttendance.siteId?.name || 'N/A'}</p>
+                    <p className="font-medium">
+                      {(serializedAttendance.siteId && typeof serializedAttendance.siteId === 'object' ? serializedAttendance.siteId.name : null) || 'N/A'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Sign In Time</p>
                     <p className="font-medium">
-                      {new Date(serializedAttendance.signInTime).toLocaleTimeString()}
+                      {serializedAttendance.signInTime ? new Date(serializedAttendance.signInTime).toLocaleTimeString() : 'N/A'}
                     </p>
                   </div>
                   {serializedAttendance.signOutTime && (
@@ -154,7 +157,7 @@ export default async function LabourDashboard() {
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Annual Leave Balance: <span className="font-semibold">{serializedEmployee.annualLeaveBalance || 0} days</span>
+                  Annual Leave Balance: <span className="font-semibold">{serializedEmployee?.annualLeaveBalance ?? 0} days</span>
                 </p>
                 <Link href="/attendance/leave-request">
                   <Button className="w-full">Request Leave</Button>
@@ -212,14 +215,14 @@ export default async function LabourDashboard() {
                   >
                     <div>
                       <p className="font-medium">
-                        {new Date(att.date).toLocaleDateString('en-US', {
+                        {att.date ? new Date(att.date).toLocaleDateString('en-US', {
                           weekday: 'short',
                           month: 'short',
                           day: 'numeric',
-                        })}
+                        }) : 'N/A'}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {att.siteId?.name || 'N/A'} • {att.signInTime ? new Date(att.signInTime).toLocaleTimeString() : 'N/A'}
+                        {(att.siteId && typeof att.siteId === 'object' ? att.siteId.name : null) || 'N/A'} • {att.signInTime ? new Date(att.signInTime).toLocaleTimeString() : 'N/A'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

@@ -49,40 +49,40 @@ export default function SiteWidget({ site }) {
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg">{site.name}</CardTitle>
+      <CardHeader className="pb-3 sm:pb-6">
+        <div className="flex items-start sm:items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base sm:text-lg truncate">{site.name}</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">{site.siteCode}</p>
           </div>
           {alerts.missingDailyLog && (
-            <Badge variant="destructive" className="text-xs">
+            <Badge variant="destructive" className="text-xs flex-shrink-0">
               <AlertTriangle className="h-3 w-3 mr-1" />
-              Missing Log
+              <span className="hidden sm:inline">Missing Log</span>
             </Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 sm:space-y-4">
         {/* Headcount Widget */}
-        <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="h-5 w-5 text-blue-600" />
+        <div className="flex items-center justify-between p-2 sm:p-3 bg-blue-50 rounded-lg">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-muted-foreground">Headcount</p>
-              <p className="text-lg font-bold">
+              <p className="text-base sm:text-lg font-bold">
                 {widgets.headcount.current} / {widgets.headcount.planned}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 {widgets.headcount.attendancePercentage}% attendance
               </p>
             </div>
           </div>
-          <Badge className={getHeadcountStatusColor(widgets.headcount.status)}>
+          <Badge className={`${getHeadcountStatusColor(widgets.headcount.status)} flex-shrink-0 ml-2`}>
             {getHeadcountStatusIcon(widgets.headcount.status)}
-            <span className="ml-1 capitalize">{widgets.headcount.status}</span>
+            <span className="ml-1 capitalize hidden sm:inline">{widgets.headcount.status}</span>
           </Badge>
         </div>
 
@@ -162,17 +162,17 @@ export default function SiteWidget({ site }) {
         )}
 
         {/* View Details & Alerts Links */}
-        <div className="pt-2 flex items-center justify-between">
+        <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
           <Link
             href={`/contracts-manager/sites/${site._id}`}
-            className="text-sm text-primary hover:underline"
+            className="text-xs sm:text-sm text-primary hover:underline text-center sm:text-left"
           >
             View Site Details →
           </Link>
           {alerts.activeCount > 0 && (
             <Link
               href={`/contracts-manager/alerts?siteId=${site._id}`}
-              className="text-sm text-orange-600 hover:underline"
+              className="text-xs sm:text-sm text-orange-600 hover:underline text-center sm:text-left"
             >
               View Alerts ({alerts.activeCount}) →
             </Link>

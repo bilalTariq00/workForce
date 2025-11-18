@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
 import { Site } from '@/lib/models/Site';
+import { Certification } from '@/lib/models/Certification';
 import { validateQRCode } from '@/lib/utils/qr';
 import { findNearestSite, isWithinRadius } from '@/lib/utils/geolocation';
 import { z } from 'zod';
@@ -168,6 +169,65 @@ export async function POST(req) {
         },
         { status: 400 }
       );
+    }
+
+    // Check for expired certifications (Gate Access Blocking)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiredCertifications = await Certification.find({
+      employeeId: session.user.id,
+      $or: [
+        { status: 'expired' },
+        {
+          status: { $in: ['valid', 'pending_validation'] },
+          expiryDate: { $lt: today },
+        },
+      ],
+    }).lean();
+
+    if (expiredCertifications.length > 0) {
+      const expiredTypes = expiredCertifications.map((cert) => cert.type).join(', ');
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CERTIFICATION_EXPIRED',
+            message: `Access denied: You have expired certifications (${expiredTypes}). Please renew your certifications before accessing the site.`,
+            expiredCertifications: expiredCertifications.map((cert) => ({
+              type: cert.type,
+              expiryDate: cert.expiryDate,
+            })),
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check for required certifications (optional - can be configured per site)
+    // For now, we'll just check if they have at least one valid certification
+    const validCertifications = await Certification.find({
+      employeeId: session.user.id,
+      status: 'valid',
+      expiryDate: { $gte: today },
+    }).lean();
+
+    // Optional: Require specific certifications (e.g., SafePass) for site access
+    // This can be configured per site or globally
+    // For now, we'll just log a warning if no valid certifications exist
+    if (validCertifications.length === 0) {
+      console.warn(`Employee ${session.user.id} has no valid certifications but attempting site access`);
+      // Uncomment below to block access if no valid certifications
+      // return NextResponse.json(
+      //   {
+      //     success: false,
+      //     error: {
+      //       code: 'NO_VALID_CERTIFICATION',
+      //       message: 'Access denied: You must have at least one valid certification to access the site.',
+      //     },
+      //   },
+      //   { status: 403 }
+      // );
     }
 
     // Create attendance record

@@ -123,13 +123,30 @@ export default function ContractsManagerLayout({ children }) {
           {/* Header */}
           <header className="sticky top-0 z-40 w-full border-b border-primary/20 bg-primary text-white">
             <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-4">
-                <h1 className="text-lg font-semibold">Contracts Manager</h1>
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden text-white hover:bg-white/20 flex-shrink-0"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+                </Button>
+                <h1 className="text-lg sm:text-xl font-semibold text-white truncate">Contracts Manager</h1>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-white/70 hidden sm:inline">
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                <div className="hidden sm:block text-xs sm:text-sm text-white/90 truncate max-w-[120px] sm:max-w-none">
                   {session?.user?.name}
-                </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-white hover:bg-white/20 hover:text-white flex-shrink-0"
+                >
+                  <LogOut className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
               </div>
             </div>
           </header>
