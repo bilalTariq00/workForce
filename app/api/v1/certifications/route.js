@@ -11,7 +11,24 @@ import { z } from 'zod';
  */
 const createCertificationSchema = z.object({
   type: z.enum(['SafePass', 'CSCS', 'FirstAid', 'Forklift', 'Other']),
-  documentUrl: z.string().url('Document URL must be a valid URL'),
+  documentUrl: z.string().refine(
+    (url) => {
+      // Accept absolute URLs (http/https) or relative URLs starting with /
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        try {
+          new URL(url);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      // Accept relative URLs starting with /
+      return url.startsWith('/');
+    },
+    {
+      message: 'Document URL must be a valid absolute URL (http/https) or relative URL (starting with /)',
+    }
+  ),
   documentType: z.enum(['pdf', 'jpg', 'png']),
   issueDate: z.string().or(z.date()),
   expiryDate: z.string().or(z.date()),

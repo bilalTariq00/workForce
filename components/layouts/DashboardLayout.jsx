@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Calendar,
   DollarSign,
+  Award,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -59,6 +60,11 @@ export default function DashboardLayout({ children }) {
       title: 'Leave Requests',
       icon: Calendar,
       href: '/hr/leave-requests',
+    },
+    {
+      title: 'Certifications',
+      icon: Award,
+      href: '/hr/certifications',
     },
     {
       title: 'Payroll',

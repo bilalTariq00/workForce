@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
 import { Employee } from '@/lib/models/Employee';
+import { Site } from '@/lib/models/Site';
 import LabourLayout from '@/components/layouts/LabourLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,18 +44,22 @@ export default async function LabourDashboard() {
   let employee;
   if (dbConnected) {
     try {
-      console.log('[LABOUR DASHBOARD] Fetching employee with ID:', session.user.id);
-      console.log('[LABOUR DASHBOARD] Session email:', session.user?.email);
+      const sessionUserId = session.user.id;
+      const sessionEmail = session.user?.email;
       
-      // Try to find by _id first
-      employee = await Employee.findById(session.user.id)
+      console.log('[LABOUR DASHBOARD] Fetching employee with ID:', sessionUserId);
+      console.log('[LABOUR DASHBOARD] Session email:', sessionEmail);
+      
+      // Use the same approach as the debug endpoint (which works)
+      // Try findById first (Mongoose handles string to ObjectId conversion automatically)
+      employee = await Employee.findById(sessionUserId)
         .populate('siteId', 'name siteCode address')
         .lean();
       
-      // If not found by ID, try by email (fallback)
-      if (!employee && session.user?.email) {
-        console.log('[LABOUR DASHBOARD] Employee not found by ID, trying email:', session.user.email);
-        employee = await Employee.findOne({ email: session.user.email.toLowerCase() })
+      // If not found by ID, try by email (fallback - same as debug endpoint)
+      if (!employee && sessionEmail) {
+        console.log('[LABOUR DASHBOARD] Employee not found by ID, trying email:', sessionEmail);
+        employee = await Employee.findOne({ email: sessionEmail.toLowerCase() })
           .populate('siteId', 'name siteCode address')
           .lean();
       }
@@ -84,18 +89,11 @@ export default async function LabourDashboard() {
           );
         }
       } else {
-        console.error('[LABOUR DASHBOARD] Employee not found for ID:', session.user.id, 'or email:', session.user?.email);
-        
-        // Try to find any employee with this email to help debug
-        if (session.user?.email) {
-          const anyEmployee = await Employee.findOne({ email: session.user.email.toLowerCase() }).lean();
-          if (anyEmployee) {
-            console.error('[LABOUR DASHBOARD] Found employee with different ID:', anyEmployee._id, 'Expected:', session.user.id);
-          }
-        }
+        console.error('[LABOUR DASHBOARD] Employee not found for ID:', sessionUserId, 'or email:', sessionEmail);
       }
     } catch (error) {
       console.error('[LABOUR DASHBOARD] Error fetching employee:', error);
+      console.error('[LABOUR DASHBOARD] Error stack:', error.stack);
       // Don't redirect on error, show error message instead
     }
   }
