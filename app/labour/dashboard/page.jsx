@@ -41,60 +41,78 @@ export default async function LabourDashboard() {
   }
 
   // Get today's attendance
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  let attendance = null;
+  let recentAttendance = [];
+  
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const attendance = await Attendance.findOne({
-    employeeId: session.user.id,
-    date: {
-      $gte: today,
-      $lt: tomorrow,
-    },
-  })
-    .populate('siteId', 'name siteCode')
-    .lean();
+    attendance = await Attendance.findOne({
+      employeeId: session.user.id,
+      date: {
+        $gte: today,
+        $lt: tomorrow,
+      },
+    })
+      .populate('siteId', 'name siteCode')
+      .lean();
 
-  // Get recent attendance (last 7 days)
-  const sevenDaysAgo = new Date(today);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // Get recent attendance (last 7 days)
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const recentAttendance = await Attendance.find({
-    employeeId: session.user.id,
-    date: {
-      $gte: sevenDaysAgo,
-      $lt: tomorrow,
-    },
-  })
-    .populate('siteId', 'name siteCode')
-    .sort({ date: -1 })
-    .limit(7)
-    .lean();
+    recentAttendance = await Attendance.find({
+      employeeId: session.user.id,
+      date: {
+        $gte: sevenDaysAgo,
+        $lt: tomorrow,
+      },
+    })
+      .populate('siteId', 'name siteCode')
+      .sort({ date: -1 })
+      .limit(7)
+      .lean();
+  } catch (error) {
+    console.error('Error fetching attendance:', error);
+    // Continue with null/empty arrays
+  }
 
-  // Serialize all Mongoose objects (already using .lean() so they're plain objects, but serialize for safety)
+  // Serialize all Mongoose objects using JSON.parse/stringify (safer for Next.js)
+  // .lean() already returns plain objects, but we need to ensure they're fully serializable
   let serializedEmployee, serializedAttendance, serializedRecentAttendance;
   try {
-    serializedEmployee = employee ? serializeMongoose(employee) : null;
-    serializedAttendance = attendance ? serializeMongoose(attendance) : null;
-    serializedRecentAttendance = recentAttendance ? recentAttendance.map(a => serializeMongoose(a)) : [];
+    // Use JSON serialization which is safer and handles all edge cases
+    serializedEmployee = employee ? JSON.parse(JSON.stringify(employee)) : null;
+    serializedAttendance = attendance ? JSON.parse(JSON.stringify(attendance)) : null;
+    serializedRecentAttendance = recentAttendance ? JSON.parse(JSON.stringify(recentAttendance)) : [];
   } catch (error) {
     console.error('Error serializing data:', error);
-    // Fallback to plain objects if serialization fails
-    serializedEmployee = employee || null;
-    serializedAttendance = attendance || null;
-    serializedRecentAttendance = recentAttendance || [];
+    // Fallback: use serializeMongoose or plain objects
+    try {
+      serializedEmployee = employee ? serializeMongoose(employee) : null;
+      serializedAttendance = attendance ? serializeMongoose(attendance) : null;
+      serializedRecentAttendance = recentAttendance ? recentAttendance.map(a => serializeMongoose(a)) : [];
+    } catch (err) {
+      console.error('Fallback serialization also failed:', err);
+      // Last resort: use as-is (should work with .lean())
+      serializedEmployee = employee || null;
+      serializedAttendance = attendance || null;
+      serializedRecentAttendance = recentAttendance || [];
+    }
   }
 
   // Extract site info for easier access (handle both populated and non-populated cases)
-  const siteIdData = serializedEmployee?.siteId;
-  const siteName = (siteIdData && typeof siteIdData === 'object' && siteIdData.name) ? siteIdData.name : null;
-  const siteCode = (siteIdData && typeof siteIdData === 'object' && siteIdData.siteCode) ? siteIdData.siteCode : null;
-  const siteAddress = (siteIdData && typeof siteIdData === 'object' && siteIdData.address) ? siteIdData.address : null;
+  const siteIdData = serializedEmployee?.siteId || null;
+  const siteName = (siteIdData && typeof siteIdData === 'object' && siteIdData !== null && siteIdData.name) ? String(siteIdData.name) : null;
+  const siteCode = (siteIdData && typeof siteIdData === 'object' && siteIdData !== null && siteIdData.siteCode) ? String(siteIdData.siteCode) : null;
+  const siteAddress = (siteIdData && typeof siteIdData === 'object' && siteIdData !== null && siteIdData.address) ? siteIdData.address : null;
   
   // Safely extract address fields
-  const addressStreet = siteAddress && typeof siteAddress === 'object' ? siteAddress.street : null;
-  const addressCity = siteAddress && typeof siteAddress === 'object' ? siteAddress.city : null;
+  const addressStreet = (siteAddress && typeof siteAddress === 'object' && siteAddress !== null && siteAddress.street) ? String(siteAddress.street) : null;
+  const addressCity = (siteAddress && typeof siteAddress === 'object' && siteAddress !== null && siteAddress.city) ? String(siteAddress.city) : null;
 
   return (
     <LabourLayout>
@@ -105,7 +123,7 @@ export default async function LabourDashboard() {
             Welcome, {serializedEmployee?.firstName || serializedEmployee?.name || 'User'}!
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Employee ID: {serializedEmployee?.employeeId || 'N/A'} | {siteName ? `Site: ${siteName}` : 'No site assigned'}
+            Employee ID: {String(serializedEmployee?.employeeId || 'N/A')} | {siteName ? `Site: ${siteName}` : 'No site assigned'}
           </p>
         </div>
 
@@ -176,7 +194,7 @@ export default async function LabourDashboard() {
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Annual Leave Balance: <span className="font-semibold">{serializedEmployee?.annualLeaveBalance ?? 0} days</span>
+                  Annual Leave Balance: <span className="font-semibold">{Number(serializedEmployee?.annualLeaveBalance) || 0} days</span>
                 </p>
                 <Link href="/attendance/leave-request">
                   <Button className="w-full">Request Leave</Button>
