@@ -41,85 +41,118 @@ export default async function ContractsManagerReportsPage() {
   // Get date ranges
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
   const thisWeekStart = new Date(today);
   thisWeekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
   const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
 
-  // Get statistics
-  const totalSites = await Site.countDocuments({ status: 'active' });
-  
-  // Attendance statistics
-  const todayAttendance = await Attendance.countDocuments({
-    date: {
-      $gte: today,
-      $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-    },
-  });
+  // Get statistics with error handling
+  let totalSites = 0;
+  let todayAttendance = 0;
+  let thisWeekAttendance = 0;
+  let thisMonthPayrollData = { totalGross: 0, totalNet: 0, count: 0 };
+  let lastMonthPayrollData = { totalGross: 0, totalNet: 0, count: 0 };
+  let pendingVariations = 0;
+  let approvedVariations = 0;
+  let totalVariationCostValue = 0;
+  let activeAlerts = 0;
+  let criticalAlerts = 0;
+  let todayLogs = 0;
+  let missingLogs = 0;
 
-  const thisWeekAttendance = await Attendance.countDocuments({
-    date: { $gte: thisWeekStart },
-  });
+  try {
+    totalSites = await Site.countDocuments({ status: 'active' });
+  } catch (error) {
+    console.error('[CM REPORTS] Error fetching sites:', error);
+  }
 
-  // Payroll statistics
-  const thisMonthPayroll = await PayrollRun.aggregate([
-    {
-      $match: {
-        periodStart: { $gte: thisMonthStart },
+  try {
+    todayAttendance = await Attendance.countDocuments({
+      date: {
+        $gte: today,
+        $lt: tomorrow,
       },
-    },
-    {
-      $group: {
-        _id: null,
-        totalGross: { $sum: '$totalGross' },
-        totalNet: { $sum: '$totalNet' },
-        count: { $sum: 1 },
+    });
+
+    thisWeekAttendance = await Attendance.countDocuments({
+      date: { $gte: thisWeekStart },
+    });
+  } catch (error) {
+    console.error('[CM REPORTS] Error fetching attendance:', error);
+  }
+
+  try {
+    const thisMonthPayroll = await PayrollRun.aggregate([
+      {
+        $match: {
+          periodStart: { $gte: thisMonthStart },
+        },
       },
-    },
-  ]);
-
-  const lastMonthPayroll = await PayrollRun.aggregate([
-    {
-      $match: {
-        periodStart: { $gte: lastMonthStart, $lt: lastMonthStart },
+      {
+        $group: {
+          _id: null,
+          totalGross: { $sum: '$totalGross' },
+          totalNet: { $sum: '$totalNet' },
+          count: { $sum: 1 },
+        },
       },
-    },
-    {
-      $group: {
-        _id: null,
-        totalGross: { $sum: '$totalGross' },
-        totalNet: { $sum: '$totalNet' },
-        count: { $sum: 1 },
+    ]);
+
+    const lastMonthPayroll = await PayrollRun.aggregate([
+      {
+        $match: {
+          periodStart: { $gte: lastMonthStart, $lt: thisMonthStart },
+        },
       },
-    },
-  ]);
+      {
+        $group: {
+          _id: null,
+          totalGross: { $sum: '$totalGross' },
+          totalNet: { $sum: '$totalNet' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
 
-  const thisMonthPayrollData = thisMonthPayroll[0] || { totalGross: 0, totalNet: 0, count: 0 };
-  const lastMonthPayrollData = lastMonthPayroll[0] || { totalGross: 0, totalNet: 0, count: 0 };
+    thisMonthPayrollData = thisMonthPayroll[0] || { totalGross: 0, totalNet: 0, count: 0 };
+    lastMonthPayrollData = lastMonthPayroll[0] || { totalGross: 0, totalNet: 0, count: 0 };
+  } catch (error) {
+    console.error('[CM REPORTS] Error fetching payroll:', error);
+  }
 
-  // Variation statistics
-  const pendingVariations = await Variation.countDocuments({ status: 'pending' });
-  const approvedVariations = await Variation.countDocuments({ status: 'approved' });
-  const totalVariationCost = await Variation.aggregate([
-    { $match: { status: 'approved' } },
-    { $group: { _id: null, total: { $sum: '$cost' } } },
-  ]);
-  const totalVariationCostValue = totalVariationCost[0]?.total || 0;
+  try {
+    pendingVariations = await Variation.countDocuments({ status: 'pending' });
+    approvedVariations = await Variation.countDocuments({ status: 'approved' });
+    
+    const totalVariationCost = await Variation.aggregate([
+      { $match: { status: 'approved' } },
+      { $group: { _id: null, total: { $sum: '$cost' } } },
+    ]);
+    totalVariationCostValue = totalVariationCost[0]?.total || 0;
+  } catch (error) {
+    console.error('[CM REPORTS] Error fetching variations:', error);
+  }
 
-  // Alert statistics
-  const activeAlerts = await Alert.countDocuments({ status: 'active' });
-  const criticalAlerts = await Alert.countDocuments({ status: 'active', severity: 'critical' });
+  try {
+    activeAlerts = await Alert.countDocuments({ status: 'active' });
+    criticalAlerts = await Alert.countDocuments({ status: 'active', severity: 'critical' });
+  } catch (error) {
+    console.error('[CM REPORTS] Error fetching alerts:', error);
+  }
 
-  // Daily log statistics
-  const todayLogs = await DailyLog.countDocuments({
-    date: {
-      $gte: today,
-      $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-    },
-  });
-
-  const missingLogs = totalSites - todayLogs;
+  try {
+    todayLogs = await DailyLog.countDocuments({
+      date: {
+        $gte: today,
+        $lt: tomorrow,
+      },
+    });
+    missingLogs = Math.max(0, totalSites - todayLogs);
+  } catch (error) {
+    console.error('[CM REPORTS] Error fetching daily logs:', error);
+  }
 
   return (
     <ContractsManagerLayout>

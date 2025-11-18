@@ -38,34 +38,97 @@ export default async function EHSDashboard() {
 
   await connectDB();
 
-  // Get incident statistics
-  const totalIncidents = await Incident.countDocuments();
-  const criticalIncidents = await Incident.countDocuments({ severity: 'critical' });
-  const openIncidents = await Incident.countDocuments({ status: { $in: ['reported', 'investigating'] } });
-  const resolvedIncidents = await Incident.countDocuments({ status: 'resolved' });
+  // Get incident statistics with error handling
+  let totalIncidents = 0;
+  let criticalIncidents = 0;
+  let openIncidents = 0;
+  let resolvedIncidents = 0;
+  
+  try {
+    totalIncidents = await Incident.countDocuments();
+    criticalIncidents = await Incident.countDocuments({ severity: 'critical' });
+    openIncidents = await Incident.countDocuments({ status: { $in: ['reported', 'under_investigation'] } });
+    resolvedIncidents = await Incident.countDocuments({ status: 'resolved' });
+  } catch (error) {
+    console.error('[EHS DASHBOARD] Error fetching incident stats:', error);
+  }
 
-  // Get inspection statistics
-  const totalInspections = await Inspection.countDocuments();
-  const openIssues = await Inspection.aggregate([
-    { $unwind: '$checklistItems' },
-    { $match: { 'checklistItems.status': 'issue' } },
-    { $count: 'count' },
-  ]);
-  const openIssuesCount = openIssues[0]?.count || 0;
-  const completedInspections = await Inspection.countDocuments({ status: 'completed' });
+  // Get inspection statistics with error handling
+  let totalInspections = 0;
+  let openIssuesCount = 0;
+  let completedInspections = 0;
+  
+  try {
+    totalInspections = await Inspection.countDocuments();
+    
+    // Try to get open issues count - check both checklistItems with 'fail' status and issues array
+    try {
+      // Count checklist items with 'fail' status
+      const failedChecklistItems = await Inspection.aggregate([
+        { $unwind: { path: '$checklistItems', preserveNullAndEmptyArrays: true } },
+        { $match: { 'checklistItems.status': 'fail' } },
+        { $count: 'count' },
+      ]);
+      
+      // Count unresolved issues in issues array
+      const unresolvedIssues = await Inspection.aggregate([
+        { $unwind: { path: '$issues', preserveNullAndEmptyArrays: true } },
+        { $match: { 
+          'issues.status': { $nin: ['resolved', 'closed'] },
+          'issues.status': { $exists: true },
+        } },
+        { $count: 'count' },
+      ]);
+      
+      const failedCount = failedChecklistItems[0]?.count || 0;
+      const unresolvedCount = unresolvedIssues[0]?.count || 0;
+      openIssuesCount = failedCount + unresolvedCount;
+    } catch (aggError) {
+      console.error('[EHS DASHBOARD] Error aggregating inspection issues:', aggError);
+      // Fallback: count inspections with any issues
+      try {
+        const inspectionsWithIssues = await Inspection.find({
+          $or: [
+            { 'checklistItems.status': 'fail' },
+            { 'issues.status': { $ne: 'resolved' } },
+          ],
+        }).countDocuments();
+        openIssuesCount = inspectionsWithIssues || 0;
+      } catch (fallbackError) {
+        console.error('[EHS DASHBOARD] Fallback query also failed:', fallbackError);
+        openIssuesCount = 0;
+      }
+    }
+    
+    completedInspections = await Inspection.countDocuments({ status: 'completed' });
+  } catch (error) {
+    console.error('[EHS DASHBOARD] Error fetching inspection stats:', error);
+  }
 
-  // Get training statistics
-  const totalTraining = await TrainingRegister.countDocuments();
-  const overdueTraining = await TrainingRegister.countDocuments({
-    status: 'overdue',
-  });
-  const dueSoonTraining = await TrainingRegister.countDocuments({
-    dueDate: {
-      $gte: new Date(),
-      $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Next 30 days
-    },
-    status: { $in: ['not_started', 'in_progress'] },
-  });
+  // Get training statistics with error handling
+  let totalTraining = 0;
+  let overdueTraining = 0;
+  let dueSoonTraining = 0;
+  
+  try {
+    totalTraining = await TrainingRegister.countDocuments();
+    overdueTraining = await TrainingRegister.countDocuments({
+      status: 'overdue',
+    });
+    
+    const dueSoonDate = new Date();
+    dueSoonDate.setDate(dueSoonDate.getDate() + 30);
+    
+    dueSoonTraining = await TrainingRegister.countDocuments({
+      dueDate: {
+        $gte: new Date(),
+        $lte: dueSoonDate,
+      },
+      status: { $in: ['not_started', 'in_progress'] },
+    });
+  } catch (error) {
+    console.error('[EHS DASHBOARD] Error fetching training stats:', error);
+  }
 
   return (
     <EHSLayout>

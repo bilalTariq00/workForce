@@ -437,18 +437,18 @@ lib/
 app/api/v1/
 ├── incidents/
 │   ├── route.js                  # List & create incidents
-│   ├── [id]/
-│   │   ├── route.js              # Get, update incident
-│   │   ├── assign/route.js       # Assign incident
-│   │   ├── resolve/route.js      # Resolve incident
-│   │   ├── close/route.js        # Close incident
-│   │   └── actions/
-│   │       └── [actionId]/route.js # Update corrective action
+│   └── [id]/
+│       ├── route.js              # Get, update incident
+│       ├── assign/route.js      # Assign incident
+│       ├── resolve/route.js     # Resolve incident
+│       ├── close/route.js        # Close incident
+│       └── actions/
+│           └── [actionId]/route.js # Update corrective action
 ├── inspections/
 │   ├── route.js                  # List & create inspections
-│   ├── [id]/
-│   │   ├── route.js              # Get, update inspection
-│   │   └── complete/route.js      # Complete inspection
+│   └── [id]/
+│       ├── route.js              # Get, update inspection
+│       └── complete/route.js     # Complete inspection
 └── training-register/
     ├── route.js                  # List & create training
     └── [id]/
