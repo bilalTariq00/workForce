@@ -5,6 +5,9 @@ import { connectDB } from '@/lib/db/mongodb';
 import { Incident } from '@/lib/models/Incident';
 import { Inspection } from '@/lib/models/Inspection';
 import { TrainingRegister } from '@/lib/models/TrainingRegister';
+// Import referenced models to ensure they're registered with Mongoose
+import { Site } from '@/lib/models/Site';
+import { Employee } from '@/lib/models/Employee';
 import EHSLayout from '@/components/layouts/EHSLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertTriangle, ClipboardCheck, GraduationCap, TrendingUp, AlertCircle } from 'lucide-react';
@@ -21,22 +24,29 @@ export const dynamic = 'force-dynamic';
  * Access: EHS Officers, HR, Admin
  */
 export default async function EHSDashboard() {
-  const session = await getServerSession(authOptions);
+  try {
+    const session = await getServerSession(authOptions);
 
-  if (!session) {
-    redirect('/login');
-  }
+    if (!session) {
+      redirect('/login');
+    }
 
-  // Only EHS, HR, and Admin can access
-  if (
-    session.user.role !== 'ehs_officer' &&
-    session.user.role !== 'hr_officer' &&
-    session.user.role !== 'admin'
-  ) {
-    redirect('/dashboard');
-  }
+    // Only EHS, HR, and Admin can access
+    if (
+      session.user.role !== 'ehs_officer' &&
+      session.user.role !== 'hr_officer' &&
+      session.user.role !== 'admin'
+    ) {
+      redirect('/dashboard');
+    }
 
-  await connectDB();
+    await connectDB();
+
+    // Ensure models are registered (imports ensure this, but explicit check helps)
+    if (!Site || !Employee || !Incident || !Inspection || !TrainingRegister) {
+      console.error('[EHS DASHBOARD] Models not properly imported');
+      throw new Error('Database models not available');
+    }
 
   // Get incident statistics with error handling
   let totalIncidents = 0;
@@ -311,5 +321,29 @@ export default async function EHSDashboard() {
       </div>
     </EHSLayout>
   );
+  } catch (error) {
+    console.error('[EHS DASHBOARD] Fatal error:', error);
+    // Return error page instead of crashing
+    return (
+      <EHSLayout>
+        <div className="space-y-4 sm:space-y-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+              Error Loading Dashboard
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              An error occurred while loading the dashboard. Please try refreshing the page.
+            </p>
+            {process.env.NODE_ENV === 'development' && (
+              <pre className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded text-xs overflow-auto">
+                {error.message}
+                {error.stack && `\n${error.stack}`}
+              </pre>
+            )}
+          </div>
+        </div>
+      </EHSLayout>
+    );
+  }
 }
 
