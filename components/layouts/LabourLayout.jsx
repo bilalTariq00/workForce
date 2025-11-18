@@ -9,6 +9,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Award,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,11 @@ export default function LabourLayout({ children }) {
       name: 'Leave Request',
       href: '/attendance/leave-request',
       icon: Calendar,
+    },
+    {
+      name: 'Certifications',
+      href: '/attendance/certifications',
+      icon: Award,
     },
   ];
 

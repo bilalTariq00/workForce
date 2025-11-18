@@ -8,9 +8,9 @@ import { DailyLog } from '@/lib/models/DailyLog';
 import { PayrollRun } from '@/lib/models/PayrollRun';
 import { Employee } from '@/lib/models/Employee';
 import { Alert } from '@/lib/models/Alert';
+import { Variation } from '@/lib/models/Variation';
 
 export const dynamic = 'force-dynamic';
-import { Variation } from '@/lib/models/Variation';
 
 /**
  * GET /api/v1/dashboard/multi-site

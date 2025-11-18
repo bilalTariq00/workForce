@@ -7,7 +7,7 @@ import { Employee } from '@/lib/models/Employee';
 import LabourLayout from '@/components/layouts/LabourLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, CheckCircle2, FileText, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, MapPin, CheckCircle2, FileText, ExternalLink, Award } from 'lucide-react';
 import Link from 'next/link';
 import { serializeMongoose } from '@/lib/utils/serialize';
 
@@ -145,7 +145,7 @@ export default async function LabourDashboard() {
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -161,6 +161,26 @@ export default async function LabourDashboard() {
                 </p>
                 <Link href="/attendance/leave-request">
                   <Button className="w-full">Request Leave</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5" />
+                Certifications
+              </CardTitle>
+              <CardDescription>Upload and manage your certifications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  SafePass, CSCS, First Aid, etc.
+                </p>
+                <Link href="/attendance/certifications">
+                  <Button className="w-full" variant="outline">Manage Certifications</Button>
                 </Link>
               </div>
             </CardContent>
