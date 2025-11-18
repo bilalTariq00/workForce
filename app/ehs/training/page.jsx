@@ -3,8 +3,11 @@ import { authOptions } from '@/lib/auth/config';
 import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Employee } from '@/lib/models/Employee';
+import { TrainingRegister } from '@/lib/models/TrainingRegister';
 import TrainingRegisterList from '@/components/ehs/TrainingRegisterList';
 import EHSLayout from '@/components/layouts/EHSLayout';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * EHS Training Register Page
@@ -14,42 +17,71 @@ import EHSLayout from '@/components/layouts/EHSLayout';
  * Access: EHS Officers, HR, Admin
  */
 export default async function TrainingPage() {
-  const session = await getServerSession(authOptions);
+  try {
+    const session = await getServerSession(authOptions);
 
-  if (!session) {
-    redirect('/login');
-  }
+    if (!session) {
+      redirect('/login');
+    }
 
-  // Only EHS, HR, and Admin can access
-  if (
-    session.user.role !== 'ehs_officer' &&
-    session.user.role !== 'hr_officer' &&
-    session.user.role !== 'admin'
-  ) {
-    redirect('/dashboard');
-  }
+    // Only EHS, HR, and Admin can access
+    if (
+      session.user.role !== 'ehs_officer' &&
+      session.user.role !== 'hr_officer' &&
+      session.user.role !== 'admin'
+    ) {
+      redirect('/dashboard');
+    }
 
-  await connectDB();
+    await connectDB();
 
-  // Get all active employees for the assignment form
-  const employees = await Employee.find({ status: 'active' })
-    .select('firstName lastName employeeId email')
-    .sort({ firstName: 1, lastName: 1 })
-    .lean();
+    // Get all active employees for the assignment form
+    let employees = [];
+    try {
+      employees = await Employee.find({ status: 'active' })
+        .select('firstName lastName employeeId email')
+        .sort({ firstName: 1, lastName: 1 })
+        .lean();
+    } catch (error) {
+      console.error('[EHS TRAINING] Error fetching employees:', error);
+    }
 
-  return (
-    <EHSLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Training Register</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Manage mandatory training assignments and track completion status
-          </p>
+    return (
+      <EHSLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Training Register</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Manage mandatory training assignments and track completion status
+            </p>
+          </div>
+
+          <TrainingRegisterList employees={employees} />
         </div>
-
-        <TrainingRegisterList employees={employees} />
-      </div>
-    </EHSLayout>
-  );
+      </EHSLayout>
+    );
+  } catch (error) {
+    console.error('[EHS TRAINING] Fatal error:', error);
+    return (
+      <EHSLayout>
+        <div className="space-y-4 sm:space-y-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+              Error Loading Page
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              An error occurred while loading the page. Please try refreshing.
+            </p>
+            {process.env.NODE_ENV === 'development' && (
+              <pre className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded text-xs overflow-auto">
+                {error.message}
+                {error.stack && `\n${error.stack}`}
+              </pre>
+            )}
+          </div>
+        </div>
+      </EHSLayout>
+    );
+  }
 }
 
