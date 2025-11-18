@@ -17,29 +17,75 @@ export default async function LabourDashboard() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
+    console.error('[LABOUR DASHBOARD] No session found');
     redirect('/login');
   }
 
   // Only labour workers can access
   if (session.user.role !== 'labour') {
+    console.log('[LABOUR DASHBOARD] Wrong role:', session.user.role, 'redirecting to /dashboard');
     redirect('/dashboard');
   }
 
-  await connectDB();
+  console.log('[LABOUR DASHBOARD] Session found, user ID:', session.user?.id, 'Role:', session.user?.role, 'Email:', session.user?.email);
+
+  let dbConnected = false;
+  try {
+    await connectDB();
+    dbConnected = true;
+    console.log('[LABOUR DASHBOARD] Database connected');
+  } catch (error) {
+    console.error('[LABOUR DASHBOARD] Database connection error:', error);
+    // Don't redirect on DB error, show error message instead
+  }
 
   // Get employee details
   let employee;
-  try {
-    employee = await Employee.findById(session.user.id)
-      .populate('siteId', 'name siteCode address')
-      .lean();
-  } catch (error) {
-    console.error('Error fetching employee:', error);
-    redirect('/login');
+  if (dbConnected) {
+    try {
+      console.log('[LABOUR DASHBOARD] Fetching employee with ID:', session.user.id);
+      employee = await Employee.findById(session.user.id)
+        .populate('siteId', 'name siteCode address')
+        .lean();
+      
+      if (employee) {
+        console.log('[LABOUR DASHBOARD] Employee found:', employee.email, employee.role);
+      } else {
+        console.error('[LABOUR DASHBOARD] Employee not found for ID:', session.user.id);
+      }
+    } catch (error) {
+      console.error('[LABOUR DASHBOARD] Error fetching employee:', error);
+      // Don't redirect on error, show error message instead
+    }
   }
 
+  // If employee not found, show error instead of redirecting
   if (!employee) {
-    redirect('/login');
+    return (
+      <LabourLayout>
+        <div className="space-y-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <h2 className="text-xl font-bold text-red-800 dark:text-red-400 mb-2">
+              Employee Record Not Found
+            </h2>
+            <p className="text-red-700 dark:text-red-300 mb-4">
+              Your account was not found in the system. This may happen if:
+            </p>
+            <ul className="list-disc list-inside text-red-700 dark:text-red-300 space-y-1 mb-4">
+              <li>Your account was recently created and needs to be activated</li>
+              <li>Your account was deactivated</li>
+              <li>There was an issue with the database connection</li>
+            </ul>
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Please contact HR or try logging out and logging back in.
+            </p>
+            <p className="text-xs text-red-500 dark:text-red-500 mt-2">
+              Session User ID: {session.user.id || 'N/A'}
+            </p>
+          </div>
+        </div>
+      </LabourLayout>
+    );
   }
 
   // Get today's attendance

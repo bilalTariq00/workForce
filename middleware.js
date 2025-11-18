@@ -39,6 +39,10 @@ export default withAuth(
 export const config = {
   matcher: [
     '/hr/:path*',
+    '/labour/:path*',
+    '/site-manager/:path*',
+    '/contracts-manager/:path*',
+    '/ehs/:path*',
     '/dashboard/:path*',
     '/attendance/:path*',
     '/qr-display/:path*',
