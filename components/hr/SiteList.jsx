@@ -110,16 +110,37 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
   return (
     <div className="space-y-4">
       {isCreateModalOpen && (
-        <div className="bg-white p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold mb-4">Create New Site</h3>
-          <CreateSiteForm onSuccess={handleCreateSuccess} onCancel={() => setIsCreateModalOpen(false)} />
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Create New Site</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCreateModalOpen(false)}
+              className="h-8 w-8 p-0"
+            >
+              ×
+            </Button>
+          </div>
+          <CreateSiteForm 
+            onSuccess={handleCreateSuccess} 
+            onCancel={() => setIsCreateModalOpen(false)} 
+          />
         </div>
       )}
 
       {!isCreateModalOpen && (
         <>
           <div className="flex justify-end">
-            <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Button 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Create Site button clicked');
+                setIsCreateModalOpen(true);
+              }}
+              type="button"
+            >
               <Building2 className="h-4 w-4 mr-2" />
               Create Site
             </Button>

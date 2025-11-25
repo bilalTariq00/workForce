@@ -10,6 +10,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import dynamic from 'next/dynamic';
+
+// Dynamically import GeofenceManager to avoid SSR and Context issues
+const GeofenceManager = dynamic(() => import('./GeofenceManager'), {
+  ssr: false,
+  loading: () => (
+    <div className="p-4 text-center text-sm text-muted-foreground">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+      Loading geofence manager...
+    </div>
+  )
+});
 // Using standard HTML labels
 
 export default function CreateSiteForm({ onSuccess, onCancel }) {
@@ -35,7 +47,9 @@ export default function CreateSiteForm({ onSuccess, onCancel }) {
     status: 'active',
     startDate: '',
     endDate: '',
+    geofence: null,
   });
+  const [showGeofenceManager, setShowGeofenceManager] = useState(false);
 
   /**
    * Fetch all Site Managers from the API
@@ -151,6 +165,7 @@ export default function CreateSiteForm({ onSuccess, onCancel }) {
           attendanceRadius: parseFloat(formData.attendanceRadius),
           startDate: formData.startDate || undefined,
           endDate: formData.endDate || undefined,
+          geofence: formData.geofence || undefined,
         }),
       });
 
@@ -264,7 +279,22 @@ export default function CreateSiteForm({ onSuccess, onCancel }) {
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-medium">Location (GPS Coordinates)</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">Location (GPS Coordinates)</h3>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowGeofenceManager(!showGeofenceManager)}
+          >
+            {showGeofenceManager ? 'Hide' : 'Setup'} Geofence
+          </Button>
+        </div>
+        {showGeofenceManager && (
+          <p className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded">
+            💡 Coordinates will be automatically filled when you select an address or set a location in the Geofence Manager below.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="location.latitude" className="block text-sm font-medium text-foreground mb-2">
@@ -336,6 +366,51 @@ export default function CreateSiteForm({ onSuccess, onCancel }) {
           </div>
         </div>
       </div>
+
+      {/* Geofence Manager */}
+      {showGeofenceManager && (
+        <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
+          <h3 className="text-sm font-medium">Geofence Configuration</h3>
+          <GeofenceManager
+            initialLocation={formData.location.latitude && formData.location.longitude ? {
+              latitude: parseFloat(formData.location.latitude),
+              longitude: parseFloat(formData.location.longitude),
+            } : null}
+            initialAddress={
+              formData.address.street || formData.address.city || formData.address.postcode
+                ? `${formData.address.street}, ${formData.address.city}, ${formData.address.postcode}, ${formData.address.country}`
+                : ''
+            }
+            initialGeofence={formData.geofence}
+            onSave={(geofence) => {
+              setFormData((prev) => ({ ...prev, geofence }));
+              setShowGeofenceManager(false);
+            }}
+            onLocationChange={(location) => {
+              // Auto-populate latitude/longitude fields when coordinates are set in GeofenceManager
+              // Only update if the values are actually different to prevent infinite loops
+              setFormData((prev) => {
+                const newLat = location.latitude.toString();
+                const newLng = location.longitude.toString();
+                
+                // Skip update if values haven't changed
+                if (prev.location.latitude === newLat && prev.location.longitude === newLng) {
+                  return prev;
+                }
+                
+                return {
+                  ...prev,
+                  location: {
+                    latitude: newLat,
+                    longitude: newLng,
+                  },
+                };
+              });
+            }}
+            onCancel={() => setShowGeofenceManager(false)}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

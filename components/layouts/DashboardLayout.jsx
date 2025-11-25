@@ -18,6 +18,7 @@ import {
   Calendar,
   DollarSign,
   Award,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -45,6 +46,11 @@ export default function DashboardLayout({ children }) {
       title: 'Sites',
       icon: Building2,
       href: '/hr/sites',
+    },
+    {
+      title: 'Tools',
+      icon: Wrench,
+      href: '/hr/tools',
     },
     {
       title: 'QR Code',

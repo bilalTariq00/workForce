@@ -7,6 +7,7 @@ import { Site } from '@/lib/models/Site';
 import { Certification } from '@/lib/models/Certification';
 import { validateQRCode } from '@/lib/utils/qr';
 import { findNearestSite, isWithinRadius } from '@/lib/utils/geolocation';
+import { isPointInGeofence } from '@/lib/utils/geofence';
 import { z } from 'zod';
 
 const markAttendanceSchema = z.object({
@@ -119,22 +120,48 @@ export async function POST(req) {
       );
     }
 
-    // Check if within radius
-    const radiusCheck = isWithinRadius(
-      nearestSite.location,
-      userLocation,
-      nearestSite.attendanceRadius
-    );
+    // Check if within geofence (or fallback to radius check)
+    let isWithinGeofence = false;
+    let distance = null;
+
+    // If site has a geofence configured, use it
+    if (nearestSite.geofence && nearestSite.geofence.type) {
+      isWithinGeofence = isPointInGeofence(userLocation, nearestSite.geofence);
+      
+      // Calculate distance for error message
+      if (nearestSite.geofence.type === 'circle') {
+        const radiusCheck = isWithinRadius(
+          nearestSite.geofence.center || nearestSite.location,
+          userLocation,
+          nearestSite.geofence.radius || nearestSite.attendanceRadius
+        );
+        distance = radiusCheck.distance;
+      } else {
+        // For polygon, calculate distance to center
+        const siteCenter = nearestSite.geofence.center || nearestSite.location;
+        const radiusCheck = isWithinRadius(siteCenter, userLocation, 1000);
+        distance = radiusCheck.distance;
+      }
+    } else {
+      // Fallback to radius check (backward compatibility)
+      const radiusCheck = isWithinRadius(
+        nearestSite.location,
+        userLocation,
+        nearestSite.attendanceRadius
+      );
+      isWithinGeofence = radiusCheck.isWithinRadius;
+      distance = radiusCheck.distance;
+    }
 
     // If distance is unreasonably large, it's likely a data issue
-    if (radiusCheck.distance > 1000000) { // More than 1000 km
+    if (distance > 1000000) { // More than 1000 km
       console.error('Unreasonably large distance detected:', {
         siteId: nearestSite._id,
         siteName: nearestSite.name,
         siteLocation: nearestSite.location,
         userLocation: userLocation,
-        distance: radiusCheck.distance,
-        distanceKm: (radiusCheck.distance / 1000).toFixed(2)
+        distance: distance,
+        distanceKm: (distance / 1000).toFixed(2)
       });
       return NextResponse.json(
         {
@@ -142,28 +169,30 @@ export async function POST(req) {
           error: {
             code: 'INVALID_SITE_LOCATION',
             message: 'Site location appears to be incorrect. Please contact HR to verify and update the site location coordinates.',
-            distance: radiusCheck.distance,
+            distance: distance,
           },
         },
         { status: 400 }
       );
     }
 
-    if (!radiusCheck.isWithinRadius) {
+    if (!isWithinGeofence) {
       // Format distance nicely
-      let distanceDisplay = `${radiusCheck.distance}m`;
-      if (radiusCheck.distance >= 1000) {
-        distanceDisplay = `${(radiusCheck.distance / 1000).toFixed(1)}km`;
+      let distanceDisplay = `${distance}m`;
+      if (distance >= 1000) {
+        distanceDisplay = `${(distance / 1000).toFixed(1)}km`;
       }
+
+      const requiredRadius = nearestSite.geofence?.radius || nearestSite.attendanceRadius;
 
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'OUT_OF_RANGE',
-            message: `You are ${distanceDisplay} away from ${nearestSite.name}. Please be within ${nearestSite.attendanceRadius}m of the site to mark attendance.`,
-            distance: radiusCheck.distance,
-            requiredRadius: nearestSite.attendanceRadius,
+            message: `You are ${distanceDisplay} away from ${nearestSite.name}. Please be within the site geofence to mark attendance.`,
+            distance: distance,
+            requiredRadius: requiredRadius,
             siteName: nearestSite.name,
           },
         },

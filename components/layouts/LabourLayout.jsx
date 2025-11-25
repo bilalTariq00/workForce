@@ -13,6 +13,7 @@ import {
   Award,
   Menu,
   User,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -34,6 +35,11 @@ export default function LabourLayout({ children }) {
       title: 'Dashboard',
       href: '/labour/dashboard',
       icon: LayoutDashboard,
+    },
+    {
+      title: 'Tools',
+      href: '/attendance/tools',
+      icon: Wrench,
     },
     {
       title: 'Leave Request',
