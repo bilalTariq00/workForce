@@ -13,6 +13,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -41,6 +42,11 @@ export default function SiteManagerLayout({ children, siteName }) {
       title: 'Dashboard',
       icon: LayoutDashboard,
       href: '/site-manager/dashboard',
+    },
+    {
+      title: 'Messages',
+      icon: MessageSquare,
+      href: '/chat',
     },
     {
       title: 'Daily Logs',

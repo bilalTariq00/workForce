@@ -1,8 +1,10 @@
 import { Inter } from 'next/font/google'
 import './globals.css'
 import 'leaflet/dist/leaflet.css'
+import 'stream-chat-react/dist/css/v2/index.css'
 import { SessionProvider } from '@/components/providers/SessionProvider'
 import QueryProvider from '@/lib/providers/QueryProvider'
+import StreamChatProvider from '@/components/providers/StreamChatProvider'
 import Script from 'next/script'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -23,7 +25,11 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={inter.className}>
         <QueryProvider>
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            <StreamChatProvider>
+              {children}
+            </StreamChatProvider>
+          </SessionProvider>
         </QueryProvider>
       </body>
     </html>

@@ -16,6 +16,7 @@ import {
   Shield,
   Award,
   FileText,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -47,6 +48,12 @@ export default function EHSLayout({ children }) {
       icon: LayoutDashboard,
       href: '/ehs/dashboard',
       description: 'Overview & statistics',
+    },
+    {
+      title: 'Messages',
+      icon: MessageSquare,
+      href: '/chat',
+      description: 'Real-time chat',
     },
   ]);
 

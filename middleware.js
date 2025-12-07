@@ -44,6 +44,8 @@ export const config = {
     '/contracts-manager/:path*',
     '/ehs/:path*',
     '/dashboard/:path*',
+    '/modules/:path*',
+    '/modules-dashboard/:path*',
     '/attendance/:path*',
     '/qr-display/:path*',
     '/api/v1/:path*',

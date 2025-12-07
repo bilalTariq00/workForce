@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { serializeMongoose } from '@/lib/utils/serialize';
+import { checkModuleAccessServer } from '@/lib/utils/checkModuleAccessServer';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Site Manager Dashboard Page
@@ -25,7 +28,7 @@ import { serializeMongoose } from '@/lib/utils/serialize';
  * 3. If locked/sent: Show read-only view
  * 4. If none: Show create form
  * 
- * Access: Only Site Managers
+ * Access: Only Site Managers with Process Management module
  */
 export default async function SiteManagerDashboard() {
   const session = await getServerSession(authOptions);
@@ -33,6 +36,12 @@ export default async function SiteManagerDashboard() {
   // Redirect to login if not authenticated
   if (!session) {
     redirect('/login');
+  }
+
+  // Check module access (Process Management module required)
+  const { hasAccess } = await checkModuleAccessServer('process_management');
+  if (!hasAccess) {
+    redirect('/modules?required=process_management');
   }
 
   // Only Site Managers can access this page

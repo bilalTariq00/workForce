@@ -8,11 +8,18 @@ import { Site } from '@/lib/models/Site';
 import { LogOut } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 
+export const dynamic = 'force-dynamic';
+
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
     redirect('/login');
+  }
+
+  // Check if user has purchased modules - redirect to module dashboard
+  if (session.user.purchasedModules && session.user.purchasedModules.length > 0) {
+    redirect('/modules-dashboard');
   }
 
   // Redirect HR to their dashboard

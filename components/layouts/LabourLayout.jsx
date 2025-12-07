@@ -14,6 +14,7 @@ import {
   Menu,
   User,
   Wrench,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -40,6 +41,11 @@ export default function LabourLayout({ children }) {
       title: 'Tools',
       href: '/attendance/tools',
       icon: Wrench,
+    },
+    {
+      title: 'Messages',
+      href: '/chat',
+      icon: MessageSquare,
     },
     {
       title: 'Leave Request',

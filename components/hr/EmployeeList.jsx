@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trash2, Mail, Phone, Edit } from 'lucide-react';
+import { Trash2, Mail, Phone, Edit, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
 import EditEmployeeModal from './EditEmployeeModal';
 
 export default function EmployeeList({ initialEmployees }) {
@@ -95,6 +96,14 @@ export default function EmployeeList({ initialEmployees }) {
                   <p className="text-xs text-gray-500 mt-1">{employee.employeeId}</p>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
+                  <Link
+                    href={`/chat/${employee._id}`}
+                    className="text-green-600 hover:text-green-800 p-2 touch-manipulation"
+                    aria-label="Chat with employee"
+                    title="Chat"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </Link>
                   <button
                     onClick={() => handleEdit(employee)}
                     className="text-blue-600 hover:text-blue-800 p-2 touch-manipulation"
@@ -181,6 +190,13 @@ export default function EmployeeList({ initialEmployees }) {
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-3">
+                    <Link
+                      href={`/chat/${employee._id}`}
+                      className="text-green-600 hover:text-green-900"
+                      title="Chat with employee"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </Link>
                     <button
                       onClick={() => handleEdit(employee)}
                       className="text-blue-600 hover:text-blue-900"

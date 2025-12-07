@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import ContractsManagerLayout from '@/components/layouts/ContractsManagerLayout';
 import MultiSiteDashboardClient from '@/components/contracts-manager/MultiSiteDashboardClient';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Contracts Manager Multi-Site Dashboard
  * 

@@ -4,9 +4,13 @@ import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
 import { Employee } from '@/lib/models/Employee';
+// Import Site model to ensure it's registered for populate()
+import { Site } from '@/lib/models/Site';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FileText, Users, Calendar, TrendingUp } from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
 
 export default async function ReportsPage() {
   const session = await getServerSession(authOptions);

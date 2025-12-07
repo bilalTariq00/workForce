@@ -9,6 +9,8 @@ const autocompleteSchema = z.object({
   limit: z.number().min(1).max(10).optional().default(5),
 });
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req) {
   try {
     const session = await getServerSession(authOptions);

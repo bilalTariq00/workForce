@@ -8,7 +8,7 @@ import LandingPageClient from '@/components/modules/LandingPageClient';
 
 export const dynamic = 'force-dynamic'; // Ensure fresh data on each request
 
-export default async function Home() {
+export default async function ModulesPage() {
   const session = await getServerSession(authOptions);
   
   try {
@@ -50,7 +50,7 @@ export default async function Home() {
     />
   );
   } catch (error) {
-    console.error('[LANDING PAGE] Error:', error);
+    console.error('[MODULES PAGE] Error:', error);
     // Return empty modules array on error
     return (
       <LandingPageClient 
@@ -68,3 +68,4 @@ export default async function Home() {
     );
   }
 }
+

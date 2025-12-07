@@ -19,6 +19,7 @@ import {
   DollarSign,
   Award,
   Wrench,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -51,6 +52,11 @@ export default function DashboardLayout({ children }) {
       title: 'Tools',
       icon: Wrench,
       href: '/hr/tools',
+    },
+    {
+      title: 'Messages',
+      icon: MessageSquare,
+      href: '/chat',
     },
     {
       title: 'QR Code',

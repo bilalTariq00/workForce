@@ -11,12 +11,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { serializeMongooseArray } from '@/lib/utils/serialize';
+import { checkModuleAccessServer } from '@/lib/utils/checkModuleAccessServer';
+
+export const dynamic = 'force-dynamic';
 
 export default async function HRDashboard() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
     redirect('/login');
+  }
+
+  // Check module access (HRM module required)
+  const { hasAccess } = await checkModuleAccessServer('hrm');
+  if (!hasAccess) {
+    redirect('/modules?required=hrm');
   }
 
   // Only HR and Admin can access

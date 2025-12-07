@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LogIn, Eye, EyeOff, Info, Copy, Check } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -51,9 +52,20 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to home page which will check attendance
+      // Handle redirect after login
       if (result?.ok) {
-        router.push('/');
+        const redirectPath = searchParams.get('redirect') || '/';
+        const action = searchParams.get('action');
+        const module = searchParams.get('module');
+        
+        if (redirectPath === '/modules' && action === 'buy' && module) {
+          // Redirect to modules page and trigger purchase
+          router.push(`/modules?buy=${module}`);
+        } else if (redirectPath === '/modules') {
+          router.push('/modules');
+        } else {
+          router.push(redirectPath);
+        }
         router.refresh();
       }
     } catch (err) {

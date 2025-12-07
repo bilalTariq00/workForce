@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { ToolAssignment } from '@/lib/models/ToolAssignment';
 
+export const dynamic = 'force-dynamic';
+
 // GET - Get overdue tool assignments and send notifications
 export async function GET(req) {
   try {

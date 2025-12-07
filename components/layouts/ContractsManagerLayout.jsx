@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -42,6 +43,11 @@ export default function ContractsManagerLayout({ children }) {
       title: 'Sites',
       icon: Building2,
       href: '/contracts-manager/sites',
+    },
+    {
+      title: 'Messages',
+      icon: MessageSquare,
+      href: '/chat',
     },
     {
       title: 'Alerts',
