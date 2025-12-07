@@ -46,6 +46,8 @@ export const config = {
     '/dashboard/:path*',
     '/modules/:path*',
     '/modules-dashboard/:path*',
+    '/registers/:path*',
+    '/procurement/:path*',
     '/attendance/:path*',
     '/qr-display/:path*',
     '/api/v1/:path*',

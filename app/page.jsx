@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'; // Ensure fresh data on each request
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
-  
+
   try {
     await connectDB();
     
@@ -24,14 +24,14 @@ export default async function Home() {
     employee = await Employee.findById(session.user.id);
     purchasedModuleCodes = employee?.purchasedModules?.map(m => m.moduleCode) || [];
     allModulesPurchased = modules.every(m => purchasedModuleCodes.includes(m.code));
-  }
+    }
 
   const modulesWithStatus = modules.map(module => ({
     ...module.toObject(),
     isPurchased: purchasedModuleCodes.includes(module.code),
     isAdmin: employee?.purchasedModules?.find(m => m.moduleCode === module.code)?.isAdmin || false,
   }));
-
+  
   const buyAllPrice = getBuyAllPrice();
   const individualTotal = Object.values(MODULE_PRICES).reduce((sum, price) => sum + price, 0);
 
@@ -66,5 +66,5 @@ export default async function Home() {
         } : null}
       />
     );
-  }
+}
 }

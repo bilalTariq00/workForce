@@ -54,19 +54,22 @@ export default function LoginPage() {
 
       // Handle redirect after login
       if (result?.ok) {
-        const redirectPath = searchParams.get('redirect') || '/';
+        const redirectPath = searchParams.get('redirect');
         const action = searchParams.get('action');
         const module = searchParams.get('module');
         
+        let targetPath = '/modules-dashboard'; // Default redirect
+        
         if (redirectPath === '/modules' && action === 'buy' && module) {
-          // Redirect to modules page and trigger purchase
-          router.push(`/modules?buy=${module}`);
+          targetPath = `/modules?buy=${module}`;
         } else if (redirectPath === '/modules') {
-          router.push('/modules');
-        } else {
-          router.push(redirectPath);
+          targetPath = '/modules';
+        } else if (redirectPath) {
+          targetPath = redirectPath;
         }
-        router.refresh();
+        
+        // Use window.location for a full page reload to ensure session is loaded
+        window.location.href = targetPath;
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
