@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
-import { Certification } from '@/lib/models/Certification';
+import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import { z } from 'zod';
 
 /**
  * Validation schema for updating certifications
  */
 const updateCertificationSchema = z.object({
-  type: z.enum(['SafePass', 'CSCS', 'FirstAid', 'Forklift', 'Other']).optional(),
+  type: z.enum(['SafePass', 'CSCS', 'FirstAid', 'Forklift', 'CPCS', 'IPAF', 'PASMA', 'Other']).optional(),
+  certificateNumber: z.string().max(100).optional(),
   documentUrl: z.string().refine(
     (url) => {
       // Accept absolute URLs (http/https) or relative URLs starting with /
@@ -28,7 +29,7 @@ const updateCertificationSchema = z.object({
       message: 'Document URL must be a valid absolute URL (http/https) or relative URL (starting with /)',
     }
   ).optional(),
-  documentType: z.enum(['pdf', 'jpg', 'png']).optional(),
+  documentType: z.enum(['pdf', 'jpg', 'jpeg', 'png']).optional(),
   issueDate: z.string().or(z.date()).optional(),
   expiryDate: z.string().or(z.date()).optional(),
   notes: z.string().max(1000).optional(),
@@ -52,7 +53,7 @@ export async function GET(req, { params }) {
 
     await connectDB();
 
-    const certification = await Certification.findById(params.id)
+    const certification = await EmployeeCertificate.findById(params.id)
       .populate('employeeId', 'firstName lastName employeeId email')
       .populate('validatedBy', 'firstName lastName employeeId')
       .lean();
@@ -126,7 +127,7 @@ export async function PUT(req, { params }) {
 
     await connectDB();
 
-    const certification = await Certification.findById(params.id);
+    const certification = await EmployeeCertificate.findById(params.id);
 
     if (!certification) {
       return NextResponse.json(
@@ -174,6 +175,7 @@ export async function PUT(req, { params }) {
 
     // Update fields
     if (validatedData.type) certification.type = validatedData.type;
+    if (validatedData.certificateNumber !== undefined) certification.certificateNumber = validatedData.certificateNumber;
     if (validatedData.documentUrl) certification.documentUrl = validatedData.documentUrl;
     if (validatedData.documentType) certification.documentType = validatedData.documentType;
     if (validatedData.issueDate) certification.issueDate = new Date(validatedData.issueDate);
@@ -263,7 +265,7 @@ export async function DELETE(req, { params }) {
 
     await connectDB();
 
-    const certification = await Certification.findById(params.id);
+    const certification = await EmployeeCertificate.findById(params.id);
 
     if (!certification) {
       return NextResponse.json(

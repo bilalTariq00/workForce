@@ -59,18 +59,20 @@ export default function LoginPage() {
         const action = searchParams.get('action');
         const module = searchParams.get('module');
         
-        let targetPath = '/modules-dashboard'; // Default redirect
+        let targetPath = '/dashboard'; // Default redirect - dashboard will handle role-based routing
         
         // Decode callbackUrl if it's URL encoded
         const decodedCallback = callbackUrl ? decodeURIComponent(callbackUrl) : null;
         
-        if (decodedCallback && decodedCallback !== '/login') {
+        // Only use callbackUrl if it's a specific route (not /dashboard)
+        // Otherwise, redirect to /dashboard which will route to role-specific dashboard
+        if (decodedCallback && decodedCallback !== '/login' && decodedCallback !== '/dashboard') {
           targetPath = decodedCallback;
         } else if (callbackUrl === '/modules' && action === 'buy' && module) {
           targetPath = `/modules?buy=${module}`;
         } else if (callbackUrl === '/modules') {
           targetPath = '/modules';
-        } else if (callbackUrl && callbackUrl !== '/login') {
+        } else if (callbackUrl && callbackUrl !== '/login' && callbackUrl !== '/dashboard') {
           targetPath = callbackUrl;
         }
         

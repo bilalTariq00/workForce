@@ -114,6 +114,8 @@ const updateEmployeeSchema = z.object({
       type: z.enum(['fixed', 'percentage']).default('fixed'),
     })).optional(),
   }).optional(),
+  // Role Template
+  roleTemplateId: z.string().optional(),
 });
 
 // PATCH - Update employee
@@ -179,6 +181,18 @@ export async function PATCH(req, { params }) {
     // Hash password if provided
     if (validatedData.password) {
       validatedData.password = await bcrypt.hash(validatedData.password, 10);
+    }
+
+    // Validate role template if provided
+    if (validatedData.roleTemplateId) {
+      const { RoleTemplate } = await import('@/lib/models/RoleTemplate');
+      const roleTemplate = await RoleTemplate.findById(validatedData.roleTemplateId);
+      if (!roleTemplate) {
+        return NextResponse.json(
+          { success: false, error: { code: 'INVALID_ROLE_TEMPLATE', message: 'Role template not found' } },
+          { status: 400 }
+        );
+      }
     }
 
     // Handle site assignments

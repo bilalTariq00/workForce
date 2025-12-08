@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
-import { Certification } from '@/lib/models/Certification';
+import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import CertificationUpload from '@/components/attendance/CertificationUpload';
 import CertificationList from '@/components/attendance/CertificationList';
 
@@ -23,7 +23,7 @@ export default async function CertificationsPage({ searchParams }) {
   await connectDB();
 
   // Get employee's certifications
-  const certifications = await Certification.find({ employeeId: session.user.id })
+  const certifications = await EmployeeCertificate.find({ employeeId: session.user.id })
     .populate('validatedBy', 'firstName lastName')
     .sort({ createdAt: -1 })
     .lean();

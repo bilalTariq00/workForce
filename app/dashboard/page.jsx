@@ -17,34 +17,13 @@ export default async function Dashboard() {
     redirect('/login');
   }
 
-  // Check if user has purchased modules - redirect to module dashboard
-  if (session.user.purchasedModules && session.user.purchasedModules.length > 0) {
-    redirect('/modules-dashboard');
-  }
+  // Import role dashboard utility
+  const { getRoleDashboard } = await import('@/lib/utils/roleDashboard');
 
-  // Redirect HR to their dashboard
-  if (session.user.role === 'hr_officer' || session.user.role === 'admin') {
-    redirect('/hr/dashboard');
-  }
-
-  // Redirect EHS Officers to their dashboard
-  if (session.user.role === 'ehs_officer') {
-    redirect('/ehs/dashboard');
-  }
-
-  // Redirect Site Managers to their dashboard
-  if (session.user.role === 'site_manager') {
-    redirect('/site-manager/dashboard');
-  }
-
-  // Redirect Contracts Managers to their dashboard
-  if (session.user.role === 'contracts_manager') {
-    redirect('/contracts-manager/dashboard');
-  }
-
-  // Redirect Labour workers to their dashboard
-  if (session.user.role === 'labour') {
-    redirect('/labour/dashboard');
+  // Redirect based on role
+  // Admin goes to modules-dashboard, all other roles go to their specific dashboards
+  if (session.user.role) {
+    redirect(getRoleDashboard(session.user.role));
   }
 
   // Check if attendance is marked today

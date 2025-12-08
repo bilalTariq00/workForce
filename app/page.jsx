@@ -21,7 +21,19 @@ export default async function Home() {
   let employee = null;
   
   if (session?.user?.id) {
-    employee = await Employee.findById(session.user.id);
+    employee = await Employee.findById(session.user.id)
+      .populate('roleTemplateId', 'name')
+      .lean();
+    
+    // If employee has a role (which all HR-created employees do),
+    // redirect to their role-specific dashboard
+    // Only admin goes to modules-dashboard, all other roles go to their specific dashboards
+    if (employee?.role) {
+      const { redirect } = await import('next/navigation');
+      const { getRoleDashboard } = await import('@/lib/utils/roleDashboard');
+      redirect(getRoleDashboard(employee.role));
+    }
+    
     purchasedModuleCodes = employee?.purchasedModules?.map(m => m.moduleCode) || [];
     allModulesPurchased = modules.every(m => purchasedModuleCodes.includes(m.code));
     }

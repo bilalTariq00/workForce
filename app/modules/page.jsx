@@ -14,6 +14,24 @@ export default async function ModulesPage() {
   try {
     await connectDB();
     
+    // If user is logged in, check if they have a role
+    // ALL employees created by HR have a role and should use role-based access
+    // They should NOT browse/purchase modules - access is automatic based on role
+    if (session?.user?.id) {
+      const employee = await Employee.findById(session.user.id)
+        .populate('roleTemplateId', 'name')
+        .lean();
+      
+      // If employee has a role (which all HR-created employees do),
+      // redirect to their role-specific dashboard
+      // Only admin can browse modules, all other roles go to their dashboards
+      if (employee?.role) {
+        const { redirect } = await import('next/navigation');
+        const { getRoleDashboard } = await import('@/lib/utils/roleDashboard');
+        redirect(getRoleDashboard(employee.role));
+      }
+    }
+    
     const modules = await Module.find({ isActive: true }).sort({ name: 1 });
   
   let purchasedModuleCodes = [];

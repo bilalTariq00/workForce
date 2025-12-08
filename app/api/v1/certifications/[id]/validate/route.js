@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
-import { Certification } from '@/lib/models/Certification';
+import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import { z } from 'zod';
 
 /**
@@ -48,7 +48,7 @@ export async function POST(req, { params }) {
 
     await connectDB();
 
-    const certification = await Certification.findById(params.id);
+    const certification = await EmployeeCertificate.findById(params.id);
 
     if (!certification) {
       return NextResponse.json(

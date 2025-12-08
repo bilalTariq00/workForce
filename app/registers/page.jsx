@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
 import { Employee } from '@/lib/models/Employee';
-import { Certification } from '@/lib/models/Certification';
+import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import { checkModuleAccessServer } from '@/lib/utils/checkModuleAccessServer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,12 +52,14 @@ export default async function RegistersDashboard() {
   const totalEmployees = await Employee.countDocuments({ status: { $ne: 'terminated' } });
 
   // Get certifications stats
-  const totalCertifications = await Certification.countDocuments();
-  const expiringSoon = await Certification.countDocuments({
+  const { EmployeeCertificate } = await import('@/lib/models/EmployeeCertificate');
+  const totalCertifications = await EmployeeCertificate.countDocuments();
+  const expiringSoon = await EmployeeCertificate.countDocuments({
     expiryDate: {
       $gte: new Date(),
       $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Next 30 days
     },
+    status: { $in: ['valid', 'pending_validation', 'expiring_soon'] },
   });
 
   return (

@@ -55,6 +55,8 @@ const createEmployeeSchema = z.object({
       type: z.enum(['fixed', 'percentage']).default('fixed'),
     })).optional(),
   }).optional(),
+  // Role Template
+  roleTemplateId: z.string().optional(),
 });
 
 // GET - List all employees
@@ -198,6 +200,19 @@ export async function POST(req) {
       }
     }
 
+    // Validate role template if provided
+    let roleTemplate = null;
+    if (validatedData.roleTemplateId) {
+      const { RoleTemplate } = await import('@/lib/models/RoleTemplate');
+      roleTemplate = await RoleTemplate.findById(validatedData.roleTemplateId);
+      if (!roleTemplate) {
+        return NextResponse.json(
+          { success: false, error: { code: 'INVALID_ROLE_TEMPLATE', message: 'Role template not found' } },
+          { status: 400 }
+        );
+      }
+    }
+
     // Create employee
     const employee = await Employee.create({
       ...employeeData,
@@ -207,6 +222,9 @@ export async function POST(req) {
       createdBy: session.user.id,
       status: 'active',
     });
+
+    // If employee has roleTemplateId, module access is automatically granted via role template
+    // No need to manually set purchasedModules - access is checked via roleTemplateId.permissions
 
     // Create site assignments if provided
     if (assignedSites && assignedSites.length > 0) {

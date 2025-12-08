@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
 import { Site } from '@/lib/models/Site';
-import { Certification } from '@/lib/models/Certification';
+import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import { validateQRCode } from '@/lib/utils/qr';
 import { findNearestSite, isWithinRadius } from '@/lib/utils/geolocation';
 import { isPointInGeofence } from '@/lib/utils/geofence';
@@ -205,12 +205,12 @@ export async function POST(req) {
     const todayForCert = new Date(today);
     todayForCert.setHours(0, 0, 0, 0);
 
-    const expiredCertifications = await Certification.find({
+    const expiredCertifications = await EmployeeCertificate.find({
       employeeId: session.user.id,
       $or: [
         { status: 'expired' },
         {
-          status: { $in: ['valid', 'pending_validation'] },
+          status: { $in: ['valid', 'pending_validation', 'expiring_soon'] },
           expiryDate: { $lt: todayForCert },
         },
       ],
@@ -236,9 +236,9 @@ export async function POST(req) {
 
     // Check for required certifications (optional - can be configured per site)
     // For now, we'll just check if they have at least one valid certification
-    const validCertifications = await Certification.find({
+    const validCertifications = await EmployeeCertificate.find({
       employeeId: session.user.id,
-      status: 'valid',
+      status: { $in: ['valid', 'expiring_soon'] },
       expiryDate: { $gte: todayForCert },
     }).lean();
 

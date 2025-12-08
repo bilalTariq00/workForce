@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
-import { Certification } from '@/lib/models/Certification';
+import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import { Employee } from '@/lib/models/Employee';
 import { z } from 'zod';
 
@@ -10,7 +10,8 @@ import { z } from 'zod';
  * Validation schema for creating certifications
  */
 const createCertificationSchema = z.object({
-  type: z.enum(['SafePass', 'CSCS', 'FirstAid', 'Forklift', 'Other']),
+  type: z.enum(['SafePass', 'CSCS', 'FirstAid', 'Forklift', 'CPCS', 'IPAF', 'PASMA', 'Other']),
+  certificateNumber: z.string().max(100).optional(),
   documentUrl: z.string().refine(
     (url) => {
       // Accept absolute URLs (http/https) or relative URLs starting with /
@@ -29,10 +30,11 @@ const createCertificationSchema = z.object({
       message: 'Document URL must be a valid absolute URL (http/https) or relative URL (starting with /)',
     }
   ),
-  documentType: z.enum(['pdf', 'jpg', 'png']),
+  documentType: z.enum(['pdf', 'jpg', 'jpeg', 'png']),
   issueDate: z.string().or(z.date()),
   expiryDate: z.string().or(z.date()),
   notes: z.string().max(1000).optional(),
+  uploadMethod: z.enum(['camera', 'file']).optional().default('file'),
 });
 
 /**
@@ -105,10 +107,10 @@ export async function GET(req) {
         $gte: today,
         $lte: expiryThreshold,
       };
-      query.status = { $in: ['valid', 'pending_validation'] };
+      query.status = { $in: ['valid', 'pending_validation', 'expiring_soon'] };
     }
 
-    const certifications = await Certification.find(query)
+    const certifications = await EmployeeCertificate.find(query)
       .populate('employeeId', 'firstName lastName employeeId email')
       .populate('validatedBy', 'firstName lastName employeeId')
       .sort({ createdAt: -1 })
@@ -201,18 +203,19 @@ export async function POST(req) {
     }
 
     // Create certification
-    const certification = new Certification({
+    const certification = await EmployeeCertificate.create({
       employeeId: targetEmployeeId,
       type: validatedData.type,
+      certificateNumber: validatedData.certificateNumber,
       documentUrl: validatedData.documentUrl,
       documentType: validatedData.documentType,
       issueDate,
       expiryDate,
       status: 'pending_validation',
       notes: validatedData.notes,
+      uploadMethod: validatedData.uploadMethod || 'file',
+      uploadedBy: session.user.id,
     });
-
-    await certification.save();
 
     // Populate employee info
     await certification.populate('employeeId', 'firstName lastName employeeId email');
