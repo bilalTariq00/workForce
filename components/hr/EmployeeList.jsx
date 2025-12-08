@@ -90,9 +90,11 @@ export default function EmployeeList({ initialEmployees }) {
             <div key={employee._id} className="p-3 sm:p-4 border-b">
               <div className="flex items-start justify-between mb-2 gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 text-sm truncate">
-                    {employee.firstName} {employee.lastName}
-                  </h3>
+                  <Link href={`/hr/employees/${employee._id}`}>
+                    <h3 className="font-semibold text-gray-900 text-sm truncate hover:text-primary-600">
+                      {employee.firstName} {employee.lastName}
+                    </h3>
+                  </Link>
                   <p className="text-xs text-gray-500 mt-1">{employee.employeeId}</p>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
@@ -135,6 +137,36 @@ export default function EmployeeList({ initialEmployees }) {
                     {formatRole(employee.role)}
                   </span>
                 </div>
+                {/* Assigned Sites */}
+                {employee.assignedSites && employee.assignedSites.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Sites:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {employee.assignedSites.map((assignment) => {
+                        // Handle both populated object and string ID
+                        const site = assignment.siteId;
+                        const siteName = typeof site === 'object' && site !== null 
+                          ? (site.name || site.siteCode || 'Unknown Site')
+                          : (assignment.siteName || 'Unknown Site');
+                        
+                        return (
+                          <span
+                            key={assignment._id || assignment.siteId?._id || assignment.siteId || Math.random()}
+                            className={`inline-block px-2 py-0.5 rounded text-xs ${
+                              assignment.isPrimary
+                                ? 'bg-primary-100 text-primary-800 font-medium'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                            title={assignment.isPrimary ? 'Primary Site' : ''}
+                          >
+                            {siteName}
+                            {assignment.isPrimary && ' ★'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -154,6 +186,9 @@ export default function EmployeeList({ initialEmployees }) {
                 Role
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Sites
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -166,9 +201,11 @@ export default function EmployeeList({ initialEmployees }) {
               <tr key={employee._id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {employee.firstName} {employee.lastName}
-                    </div>
+                    <Link href={`/hr/employees/${employee._id}`}>
+                      <div className="text-sm font-medium text-gray-900 hover:text-primary-600">
+                        {employee.firstName} {employee.lastName}
+                      </div>
+                    </Link>
                     <div className="text-xs text-gray-500">{employee.employeeId}</div>
                   </div>
                 </td>
@@ -180,6 +217,43 @@ export default function EmployeeList({ initialEmployees }) {
                   <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getRoleBadgeColor(employee.role)}`}>
                     {formatRole(employee.role)}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {employee.assignedSites && Array.isArray(employee.assignedSites) && employee.assignedSites.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {employee.assignedSites.map((assignment, idx) => {
+                        // Handle both populated object and string ID
+                        const site = assignment.siteId;
+                        let siteName = 'Unknown Site';
+                        
+                        if (site) {
+                          if (typeof site === 'object' && site !== null) {
+                            siteName = site.name || site.siteCode || 'Unknown Site';
+                          } else if (typeof site === 'string') {
+                            // If it's a string ID, we can't display the name without fetching
+                            siteName = 'Site ' + site.substring(0, 8);
+                          }
+                        }
+                        
+                        return (
+                          <span
+                            key={assignment._id || assignment.siteId?._id || assignment.siteId || `site-${idx}`}
+                            className={`inline-block px-2 py-0.5 rounded text-xs ${
+                              assignment.isPrimary
+                                ? 'bg-primary-100 text-primary-800 font-medium'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                            title={assignment.isPrimary ? 'Primary Site' : ''}
+                          >
+                            {siteName}
+                            {assignment.isPrimary && ' ★'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">No sites</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${

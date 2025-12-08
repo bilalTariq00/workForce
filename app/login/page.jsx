@@ -54,22 +54,30 @@ export default function LoginPage() {
 
       // Handle redirect after login
       if (result?.ok) {
-        const redirectPath = searchParams.get('redirect');
+        // Get callbackUrl from NextAuth or use redirect param
+        const callbackUrl = searchParams.get('callbackUrl') || searchParams.get('redirect');
         const action = searchParams.get('action');
         const module = searchParams.get('module');
         
         let targetPath = '/modules-dashboard'; // Default redirect
         
-        if (redirectPath === '/modules' && action === 'buy' && module) {
+        // Decode callbackUrl if it's URL encoded
+        const decodedCallback = callbackUrl ? decodeURIComponent(callbackUrl) : null;
+        
+        if (decodedCallback && decodedCallback !== '/login') {
+          targetPath = decodedCallback;
+        } else if (callbackUrl === '/modules' && action === 'buy' && module) {
           targetPath = `/modules?buy=${module}`;
-        } else if (redirectPath === '/modules') {
+        } else if (callbackUrl === '/modules') {
           targetPath = '/modules';
-        } else if (redirectPath) {
-          targetPath = redirectPath;
+        } else if (callbackUrl && callbackUrl !== '/login') {
+          targetPath = callbackUrl;
         }
         
-        // Use window.location for a full page reload to ensure session is loaded
-        window.location.href = targetPath;
+        // Small delay to ensure cookie is set, then redirect
+        setTimeout(() => {
+          window.location.href = targetPath;
+        }, 100);
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

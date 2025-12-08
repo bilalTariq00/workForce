@@ -14,11 +14,46 @@ const createEmployeeSchema = z.object({
   password: z.string().min(6),
   role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']),
   payRate: z.number().min(0).optional(),
-  siteId: z.string().nullable().optional(), // Allow assigning to site
+  siteId: z.string().nullable().optional(), // Legacy: single site assignment (for backward compatibility)
+  assignedSites: z.array(z.object({
+    siteId: z.string(),
+    role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']),
+    isPrimary: z.boolean().optional().default(false),
+    notes: z.string().max(500).optional(),
+  })).optional(), // New: multi-site assignment
   annualLeaveBalance: z.number().min(0).optional(), // Annual leave balance in days
   bankDetails: z.object({
     accountNumber: z.string().optional(),
     sortCode: z.string().optional(),
+  }).optional(),
+  // HR Data
+  dateOfBirth: z.string().datetime().optional().or(z.string().date().optional()),
+  nationalInsuranceNumber: z.string().regex(/^[A-Z]{2}[0-9]{6}[A-Z]{1}$/i).optional(),
+  emergencyContact: z.object({
+    name: z.string().min(1).max(100),
+    relationship: z.enum(['spouse', 'parent', 'sibling', 'child', 'other']).optional(),
+    phone: z.string().optional(),
+  }).optional(),
+  employmentDetails: z.object({
+    startDate: z.string().datetime().optional().or(z.string().date().optional()),
+    employmentType: z.enum(['full_time', 'part_time', 'contractor', 'temporary']).optional(),
+    department: z.string().max(100).optional(),
+    position: z.string().max(100).optional(),
+  }).optional(),
+  // Payroll Data
+  payroll: z.object({
+    payType: z.enum(['hourly', 'salary', 'daily']).optional(),
+    currency: z.enum(['GBP', 'EUR', 'USD']).optional(),
+    taxCode: z.string().regex(/^[A-Z]{0,2}[0-9]{1,4}[A-Z]{0,1}$/i).optional(),
+    pensionScheme: z.string().max(100).optional(),
+    pensionContribution: z.number().min(0).max(100).optional(),
+    studentLoan: z.boolean().optional(),
+    studentLoanPlan: z.enum(['plan1', 'plan2', 'plan4', 'postgraduate']).optional(),
+    otherDeductions: z.array(z.object({
+      name: z.string().min(1).max(100),
+      amount: z.number().min(0),
+      type: z.enum(['fixed', 'percentage']).default('fixed'),
+    })).optional(),
   }).optional(),
 });
 
@@ -49,9 +84,21 @@ export async function GET(req) {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Get assigned sites for each employee
+    const { EmployeeSite } = await import('@/lib/models/EmployeeSite');
+    const employeesWithSites = await Promise.all(
+      employees.map(async (employee) => {
+        const assignedSites = await EmployeeSite.getEmployeeSites(employee._id);
+        return {
+          ...employee,
+          assignedSites,
+        };
+      })
+    );
+
     return NextResponse.json({
       success: true,
-      data: employees,
+      data: employeesWithSites,
     });
 
   } catch (error) {
@@ -120,9 +167,28 @@ export async function POST(req) {
     // Hash password
     const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
-    // Validate siteId if provided
+    // Handle site assignments
+    const { EmployeeSite } = await import('@/lib/models/EmployeeSite');
+    const { Site } = await import('@/lib/models/Site');
+    
+    // Prepare employee data (exclude assignedSites - will handle separately)
+    const { assignedSites, ...employeeData } = validatedData;
+    
+    // Validate sites if assignedSites provided
+    if (assignedSites && assignedSites.length > 0) {
+      for (const assignment of assignedSites) {
+        const site = await Site.findById(assignment.siteId);
+        if (!site) {
+          return NextResponse.json(
+            { success: false, error: { code: 'INVALID_SITE', message: `Site ${assignment.siteId} not found` } },
+            { status: 400 }
+          );
+        }
+      }
+    }
+    
+    // Validate legacy siteId if provided (for backward compatibility)
     if (validatedData.siteId) {
-      const { Site } = await import('@/lib/models/Site');
       const site = await Site.findById(validatedData.siteId);
       if (!site) {
         return NextResponse.json(
@@ -134,21 +200,63 @@ export async function POST(req) {
 
     // Create employee
     const employee = await Employee.create({
-      ...validatedData,
-      email: validatedData.email.toLowerCase(),
+      ...employeeData,
+      email: employeeData.email.toLowerCase(),
       password: hashedPassword,
       employeeId,
       createdBy: session.user.id,
       status: 'active',
     });
 
+    // Create site assignments if provided
+    if (assignedSites && assignedSites.length > 0) {
+      const assignments = [];
+      for (const assignment of assignedSites) {
+        const siteAssignment = await EmployeeSite.create({
+          employeeId: employee._id,
+          siteId: assignment.siteId,
+          role: assignment.role,
+          isPrimary: assignment.isPrimary || false,
+          assignedBy: session.user.id,
+          notes: assignment.notes,
+        });
+        
+        // If this is primary, set it as primary (will unset others)
+        if (assignment.isPrimary) {
+          await siteAssignment.setAsPrimary();
+        }
+        
+        assignments.push(siteAssignment);
+      }
+      
+      // If no primary was set, set the first one as primary
+      if (!assignments.some(a => a.isPrimary)) {
+        await assignments[0].setAsPrimary();
+      }
+    } else if (validatedData.siteId) {
+      // Legacy: Create single site assignment from siteId
+      await EmployeeSite.create({
+        employeeId: employee._id,
+        siteId: validatedData.siteId,
+        role: validatedData.role,
+        isPrimary: true,
+        assignedBy: session.user.id,
+      });
+    }
+
     const employeeResponse = employee.toObject();
     delete employeeResponse.password;
+
+    // Get assigned sites for response
+    const assignedSitesResponse = await EmployeeSite.getEmployeeSites(employee._id);
 
     return NextResponse.json(
       {
         success: true,
-        data: employeeResponse,
+        data: {
+          ...employeeResponse,
+          assignedSites: assignedSitesResponse,
+        },
       },
       { status: 201 }
     );

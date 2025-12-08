@@ -8,6 +8,12 @@ export default withAuth(
     if (publicPaths.includes(req.nextUrl.pathname)) {
       return NextResponse.next();
     }
+    
+    // If user has token, allow access
+    if (req.nextauth.token) {
+      return NextResponse.next();
+    }
+    
     return NextResponse.next();
   },
   {
@@ -27,6 +33,10 @@ export default withAuth(
         }
         // Allow public QR display page (no auth needed)
         if (req.nextUrl.pathname === '/qr-display/public') {
+          return true;
+        }
+        // Allow login page itself
+        if (req.nextUrl.pathname === '/login') {
           return true;
         }
         // Require token for other paths

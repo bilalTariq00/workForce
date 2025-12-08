@@ -37,9 +37,16 @@ export async function GET(req, { params }) {
       );
     }
 
+    // Get assigned sites
+    const { EmployeeSite } = await import('@/lib/models/EmployeeSite');
+    const assignedSites = await EmployeeSite.getEmployeeSites(params.id);
+
     return NextResponse.json({
       success: true,
-      data: employee,
+      data: {
+        ...employee,
+        assignedSites,
+      },
     });
 
   } catch (error) {
@@ -66,11 +73,46 @@ const updateEmployeeSchema = z.object({
   role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']).optional(),
   payRate: z.number().min(0).optional(),
   status: z.enum(['active', 'inactive', 'terminated']).optional(),
-  siteId: z.string().nullable().optional(), // Allow assigning/unassigning site
+  siteId: z.string().nullable().optional(), // Legacy: single site assignment (for backward compatibility)
+  assignedSites: z.array(z.object({
+    siteId: z.string(),
+    role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']),
+    isPrimary: z.boolean().optional().default(false),
+    notes: z.string().max(500).optional(),
+  })).optional(), // New: multi-site assignment
   annualLeaveBalance: z.number().min(0).optional(), // Annual leave balance in days
   bankDetails: z.object({
     accountNumber: z.string().optional(),
     sortCode: z.string().optional(),
+  }).optional(),
+  // HR Data
+  dateOfBirth: z.string().datetime().optional().or(z.string().date().optional()),
+  nationalInsuranceNumber: z.string().regex(/^[A-Z]{2}[0-9]{6}[A-Z]{1}$/i).optional(),
+  emergencyContact: z.object({
+    name: z.string().min(1).max(100),
+    relationship: z.enum(['spouse', 'parent', 'sibling', 'child', 'other']).optional(),
+    phone: z.string().optional(),
+  }).optional(),
+  employmentDetails: z.object({
+    startDate: z.string().datetime().optional().or(z.string().date().optional()),
+    employmentType: z.enum(['full_time', 'part_time', 'contractor', 'temporary']).optional(),
+    department: z.string().max(100).optional(),
+    position: z.string().max(100).optional(),
+  }).optional(),
+  // Payroll Data
+  payroll: z.object({
+    payType: z.enum(['hourly', 'salary', 'daily']).optional(),
+    currency: z.enum(['GBP', 'EUR', 'USD']).optional(),
+    taxCode: z.string().regex(/^[A-Z]{0,2}[0-9]{1,4}[A-Z]{0,1}$/i).optional(),
+    pensionScheme: z.string().max(100).optional(),
+    pensionContribution: z.number().min(0).max(100).optional(),
+    studentLoan: z.boolean().optional(),
+    studentLoanPlan: z.enum(['plan1', 'plan2', 'plan4', 'postgraduate']).optional(),
+    otherDeductions: z.array(z.object({
+      name: z.string().min(1).max(100),
+      amount: z.number().min(0),
+      type: z.enum(['fixed', 'percentage']).default('fixed'),
+    })).optional(),
   }).optional(),
 });
 
@@ -139,15 +181,20 @@ export async function PATCH(req, { params }) {
       validatedData.password = await bcrypt.hash(validatedData.password, 10);
     }
 
-    // Handle siteId assignment/unassignment
-    // If siteId is null or empty string, unassign from site
-    if (validatedData.siteId !== undefined) {
-      if (validatedData.siteId === null || validatedData.siteId === '') {
-        validatedData.siteId = null; // Unassign from site
+    // Handle site assignments
+    const { EmployeeSite } = await import('@/lib/models/EmployeeSite');
+    const { Site } = await import('@/lib/models/Site');
+    
+    // Extract assignedSites if provided
+    const { assignedSites, ...employeeUpdateData } = validatedData;
+    
+    // Handle legacy siteId assignment/unassignment (for backward compatibility)
+    if (employeeUpdateData.siteId !== undefined) {
+      if (employeeUpdateData.siteId === null || employeeUpdateData.siteId === '') {
+        employeeUpdateData.siteId = null; // Unassign from site
       } else {
         // Validate that the site exists
-        const { Site } = await import('@/lib/models/Site');
-        const site = await Site.findById(validatedData.siteId);
+        const site = await Site.findById(employeeUpdateData.siteId);
         if (!site) {
           return NextResponse.json(
             { success: false, error: { code: 'INVALID_SITE', message: 'Site not found' } },
@@ -160,7 +207,7 @@ export async function PATCH(req, { params }) {
     // Update employee
     const employee = await Employee.findByIdAndUpdate(
       employeeId,
-      { $set: validatedData },
+      { $set: employeeUpdateData },
       { new: true, runValidators: true }
     ).select('-password');
 
@@ -172,10 +219,63 @@ export async function PATCH(req, { params }) {
       );
     }
 
+    // Handle multi-site assignments if provided
+    if (assignedSites !== undefined) {
+      // Validate all sites exist
+      for (const assignment of assignedSites) {
+        const site = await Site.findById(assignment.siteId);
+        if (!site) {
+          return NextResponse.json(
+            { success: false, error: { code: 'INVALID_SITE', message: `Site ${assignment.siteId} not found` } },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Deactivate all existing assignments
+      await EmployeeSite.updateMany(
+        { employeeId, isActive: true },
+        { $set: { isActive: false } }
+      );
+
+      // Create new assignments
+      if (assignedSites.length > 0) {
+        const assignments = [];
+        for (const assignment of assignedSites) {
+          const siteAssignment = await EmployeeSite.create({
+            employeeId: employee._id,
+            siteId: assignment.siteId,
+            role: assignment.role,
+            isPrimary: assignment.isPrimary || false,
+            assignedBy: session.user.id,
+            notes: assignment.notes,
+          });
+          
+          // If this is primary, set it as primary (will unset others)
+          if (assignment.isPrimary) {
+            await siteAssignment.setAsPrimary();
+          }
+          
+          assignments.push(siteAssignment);
+        }
+        
+        // If no primary was set, set the first one as primary
+        if (!assignments.some(a => a.isPrimary)) {
+          await assignments[0].setAsPrimary();
+        }
+      }
+    }
+
+    // Get updated assigned sites
+    const updatedAssignedSites = await EmployeeSite.getEmployeeSites(employeeId);
+
     console.log('Employee updated successfully:', employee._id, 'New role:', employee.role);
     return NextResponse.json({
       success: true,
-      data: employee,
+      data: {
+        ...employee.toObject(),
+        assignedSites: updatedAssignedSites,
+      },
     });
 
   } catch (error) {

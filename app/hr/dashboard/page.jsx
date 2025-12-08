@@ -3,6 +3,8 @@ import { authOptions } from '@/lib/auth/config';
 import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Employee } from '@/lib/models/Employee';
+import { EmployeeSite } from '@/lib/models/EmployeeSite';
+import { Site } from '@/lib/models/Site';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import DashboardStats from '@/components/hr/DashboardStats';
 import EmployeeList from '@/components/hr/EmployeeList';
@@ -38,6 +40,18 @@ export default async function HRDashboard() {
     .select('-password')
     .sort({ createdAt: -1 })
     .lean();
+
+  // Get assigned sites for each employee
+  // Note: Site model is already imported above to ensure it's registered
+  const employeesWithSites = await Promise.all(
+    employees.map(async (employee) => {
+      const assignedSites = await EmployeeSite.getEmployeeSites(employee._id);
+      return {
+        ...employee,
+        assignedSites: assignedSites || [],
+      };
+    })
+  );
 
   const stats = {
     total: employees.length,
@@ -75,7 +89,7 @@ export default async function HRDashboard() {
             <CardTitle>All Employees</CardTitle>
           </CardHeader>
           <CardContent>
-            <EmployeeList initialEmployees={serializeMongooseArray(employees)} />
+            <EmployeeList initialEmployees={serializeMongooseArray(employeesWithSites)} />
           </CardContent>
         </Card>
       </div>

@@ -3,6 +3,9 @@ import { connectDB } from '@/lib/db/mongodb';
 import { Employee } from '@/lib/models/Employee';
 import bcrypt from 'bcryptjs';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 // Debug endpoint to check HR admin credentials
 export async function POST(req) {
   try {

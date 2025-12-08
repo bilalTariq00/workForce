@@ -3,6 +3,8 @@ import { authOptions } from '@/lib/auth/config';
 import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db/mongodb';
 import { Employee } from '@/lib/models/Employee';
+import { EmployeeSite } from '@/lib/models/EmployeeSite';
+import { Site } from '@/lib/models/Site';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import EmployeeList from '@/components/hr/EmployeeList';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +32,18 @@ export default async function EmployeesPage() {
     .sort({ createdAt: -1 })
     .lean();
 
+  // Get assigned sites for each employee
+  // Note: Site model is already imported above to ensure it's registered
+  const employeesWithSites = await Promise.all(
+    employees.map(async (employee) => {
+      const assignedSites = await EmployeeSite.getEmployeeSites(employee._id);
+      return {
+        ...employee,
+        assignedSites,
+      };
+    })
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -56,7 +70,7 @@ export default async function EmployeesPage() {
             <CardTitle>All Employees ({employees.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <EmployeeList initialEmployees={serializeMongooseArray(employees)} />
+            <EmployeeList initialEmployees={serializeMongooseArray(employeesWithSites)} />
           </CardContent>
         </Card>
       </div>
