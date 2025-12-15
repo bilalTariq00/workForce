@@ -39,12 +39,28 @@ export default function AdminRoleTemplateManager({ initialTemplates = [] }) {
     setLoading(true);
     try {
       const response = await fetch('/api/v1/role-templates');
+      
+      // Check if response is ok and is JSON
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`);
+      }
+      
       const result = await response.json();
       if (result.success) {
         setTemplates(result.data);
+      } else {
+        console.error('API returned error:', result.error);
       }
     } catch (err) {
       console.error('Error fetching templates:', err);
+      // Set empty array on error to prevent UI issues
+      setTemplates([]);
     } finally {
       setLoading(false);
     }
@@ -65,6 +81,18 @@ export default function AdminRoleTemplateManager({ initialTemplates = [] }) {
         method: 'DELETE',
       });
 
+      // Check if response is ok and is JSON
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}. Response: ${text.substring(0, 200)}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
+      }
+
       const result = await response.json();
 
       if (result.success) {
@@ -73,7 +101,8 @@ export default function AdminRoleTemplateManager({ initialTemplates = [] }) {
         alert(result.error?.message || 'Failed to delete template');
       }
     } catch (err) {
-      alert('An error occurred');
+      console.error('Error deleting template:', err);
+      alert(`An error occurred while deleting the template: ${err.message}`);
     } finally {
       setDeletingId(null);
     }

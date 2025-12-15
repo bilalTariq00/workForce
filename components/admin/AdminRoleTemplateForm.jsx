@@ -77,6 +77,18 @@ export default function AdminRoleTemplateForm({
         body: JSON.stringify(formData),
       });
 
+      // Check if response is ok and is JSON
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}. Response: ${text.substring(0, 200)}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
+      }
+
       const result = await response.json();
 
       if (result.success) {
