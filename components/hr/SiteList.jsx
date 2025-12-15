@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trash2, Edit, MapPin, Building2, User, UserPlus } from 'lucide-react';
+import { Trash2, Edit, MapPin, Building2, User, UserPlus, List, Map } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CreateSiteForm from './CreateSiteForm';
 import AssignSiteManagerModal from './AssignSiteManagerModal';
 import EditSiteModal from './EditSiteModal';
+import SitesMapView from './SitesMapView';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -24,6 +25,7 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [assignModalSite, setAssignModalSite] = useState(null);
   const [editingSite, setEditingSite] = useState(null);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
 
   // Sync sites with initialSites when it changes
   useEffect(() => {
@@ -131,7 +133,25 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
 
       {!isCreateModalOpen && (
         <>
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4 mr-2" />
+                List View
+              </Button>
+              <Button
+                variant={viewMode === 'map' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('map')}
+              >
+                <Map className="h-4 w-4 mr-2" />
+                Map View
+              </Button>
+            </div>
             <Button 
               onClick={(e) => {
                 e.preventDefault();
@@ -149,6 +169,10 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
           {sites.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               <p>No sites found. Create your first site to get started.</p>
+            </div>
+          ) : viewMode === 'map' ? (
+            <div className="border rounded-lg overflow-hidden" style={{ minHeight: '500px' }}>
+              <SitesMapView sites={sites} />
             </div>
           ) : (
             <div className="overflow-x-auto">

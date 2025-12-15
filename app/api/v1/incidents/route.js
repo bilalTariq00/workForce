@@ -5,6 +5,8 @@ import { connectDB } from '@/lib/db/mongodb';
 import { Incident } from '@/lib/models/Incident';
 import { Site } from '@/lib/models/Site';
 import { Employee } from '@/lib/models/Employee';
+import { checkPermission, checkModuleAccess } from '@/lib/middleware/permissionMiddleware';
+import { hasPermission } from '@/lib/utils/permissions';
 import { z } from 'zod';
 
 /**
@@ -38,15 +40,16 @@ const createIncidentSchema = z.object({
  */
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check module access - incidents are part of reports module
+    const permissionCheck = await checkModuleAccess('reports');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -58,11 +61,15 @@ export async function GET(req) {
 
     const query = {};
 
-    // Employees and Site Managers can only see incidents for their assigned site
-    if (['labour', 'site_manager'].includes(session.user.role)) {
-      const employee = await Employee.findById(session.user.id).lean();
-      if (employee?.siteId) {
-        query.siteId = employee.siteId;
+    // Check if user can only see incidents for their assigned sites
+    const canManage = hasPermission(user, 'reports', 'manage') || user.role === 'admin';
+    
+    if (!canManage) {
+      // Get user's assigned sites
+      const { EmployeeSite } = await import('@/lib/models/EmployeeSite');
+      const siteAssignments = await EmployeeSite.getEmployeeSites(user._id);
+      if (siteAssignments.length > 0) {
+        query.siteId = { $in: siteAssignments.map(s => s.siteId._id || s.siteId) };
       } else {
         // No site assigned, return empty
         return NextResponse.json({
@@ -74,8 +81,8 @@ export async function GET(req) {
 
     // Apply filters
     if (siteId) {
-      // Only EHS/HR/Admin can filter by other sites
-      if (['ehs_officer', 'hr_officer', 'admin'].includes(session.user.role)) {
+      // Only users with manage permission can filter by other sites
+      if (canManage) {
         query.siteId = siteId;
       }
     }
@@ -93,11 +100,11 @@ export async function GET(req) {
     }
 
     if (assignedTo) {
-      // Only EHS/HR/Admin can filter by assigned officer
-      if (['ehs_officer', 'hr_officer', 'admin'].includes(session.user.role)) {
+      // Only users with manage permission can filter by assigned officer
+      if (canManage) {
         query.assignedTo = assignedTo;
-      } else if (session.user.role === 'ehs_officer' && assignedTo === session.user.id) {
-        // EHS officers can see incidents assigned to them
+      } else if (assignedTo === user._id.toString()) {
+        // Users can see incidents assigned to them
         query.assignedTo = assignedTo;
       }
     }
@@ -140,15 +147,16 @@ export async function GET(req) {
  */
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission - requires 'reports' module with 'create' action
+    const permissionCheck = await checkPermission('reports', 'create');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     const body = await req.json();
     const validatedData = createIncidentSchema.parse(body);
 
@@ -169,10 +177,16 @@ export async function POST(req) {
       );
     }
 
-    // Employees and Site Managers can only report for their assigned site
-    if (['labour', 'site_manager'].includes(session.user.role)) {
-      const employee = await Employee.findById(session.user.id);
-      if (!employee || employee.siteId?.toString() !== validatedData.siteId) {
+    // Check if user can only report for their assigned sites
+    const canManage = hasPermission(user, 'reports', 'manage') || user.role === 'admin';
+    
+    if (!canManage) {
+      // Get user's assigned sites
+      const { EmployeeSite } = await import('@/lib/models/EmployeeSite');
+      const siteAssignments = await EmployeeSite.getEmployeeSites(user._id);
+      const assignedSiteIds = siteAssignments.map(s => s.siteId._id?.toString() || s.siteId.toString());
+      
+      if (!assignedSiteIds.includes(validatedData.siteId)) {
         return NextResponse.json(
           {
             success: false,
@@ -192,7 +206,7 @@ export async function POST(req) {
     // Create incident
     const incident = new Incident({
       siteId: validatedData.siteId,
-      reportedBy: session.user.id,
+      reportedBy: user._id,
       type: validatedData.type,
       severity: validatedData.severity,
       description: validatedData.description,

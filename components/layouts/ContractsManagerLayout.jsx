@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { filterMenuItemsByPermissions } from '@/lib/utils/navigation';
 
 export default function ContractsManagerLayout({ children }) {
   const { data: session } = useSession();
@@ -33,7 +34,8 @@ export default function ContractsManagerLayout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
 
-  const menuItems = [
+  // Define all menu items
+  const allMenuItems = [
     {
       title: 'Dashboard',
       icon: LayoutDashboard,
@@ -74,10 +76,26 @@ export default function ContractsManagerLayout({ children }) {
       icon: Settings,
       href: '/contracts-manager/settings',
     },
-  ].map(item => ({
-    ...item,
-    active: pathname === item.href || pathname.startsWith(item.href + '/'),
-  }));
+  ];
+
+  // Filter menu items based on user permissions
+  const menuItems = useMemo(() => {
+    if (!session?.user) return allMenuItems;
+
+    // Create user object for permission checking
+    const user = {
+      role: session.user.role,
+      roleTemplateId: session.user.roleTemplateId,
+      purchasedModules: session.user.purchasedModules || [],
+    };
+
+    const filtered = filterMenuItemsByPermissions(allMenuItems, user);
+    
+    return filtered.map(item => ({
+      ...item,
+      active: pathname === item.href || pathname.startsWith(item.href + '/'),
+    }));
+  }, [session, pathname]);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' });

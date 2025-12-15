@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Employee } from '@/lib/models/Employee';
+import { RoleTemplate } from '@/lib/models/RoleTemplate';
+import { checkPermission } from '@/lib/middleware/permissionMiddleware';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
@@ -62,20 +64,12 @@ const createEmployeeSchema = z.object({
 // GET - List all employees
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
+    // Check permission using template - requires 'hrm' module with 'view' action
+    const permissionCheck = await checkPermission('hrm', 'view');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
-    // Only HR and Admin can view all employees
-    if (session.user.role !== 'hr_officer' && session.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
-        { status: 403 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
@@ -121,22 +115,16 @@ export async function GET(req) {
 // POST - Create new employee
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
+    // Check permission using template - requires 'hrm' module with 'create' action
+    const permissionCheck = await checkPermission('hrm', 'create');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
-    // Only HR and Admin can create employees
-    if (session.user.role !== 'hr_officer' && session.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
-        { status: 403 }
-      );
-    }
+    const user = permissionCheck.user;
 
     const body = await req.json();
     const validatedData = createEmployeeSchema.parse(body);
@@ -219,7 +207,7 @@ export async function POST(req) {
       email: employeeData.email.toLowerCase(),
       password: hashedPassword,
       employeeId,
-      createdBy: session.user.id,
+      createdBy: user._id,
       status: 'active',
     });
 
@@ -235,7 +223,7 @@ export async function POST(req) {
           siteId: assignment.siteId,
           role: assignment.role,
           isPrimary: assignment.isPrimary || false,
-          assignedBy: session.user.id,
+          assignedBy: user._id,
           notes: assignment.notes,
         });
         
@@ -258,7 +246,7 @@ export async function POST(req) {
         siteId: validatedData.siteId,
         role: validatedData.role,
         isPrimary: true,
-        assignedBy: session.user.id,
+        assignedBy: user._id,
       });
     }
 

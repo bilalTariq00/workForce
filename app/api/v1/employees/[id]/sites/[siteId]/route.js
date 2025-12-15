@@ -10,6 +10,7 @@ import { z } from 'zod';
 // Validation schema for updating site assignment
 const updateSiteSchema = z.object({
   role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']).optional(),
+  roleTemplateId: z.string().optional().nullable(), // Optional role template for this site assignment
   isPrimary: z.boolean().optional(),
   notes: z.string().max(500).optional(),
 });
@@ -36,6 +37,7 @@ export async function GET(req, { params }) {
       .populate('siteId', 'name siteCode address location')
       .populate('employeeId', 'firstName lastName email employeeId')
       .populate('assignedBy', 'firstName lastName')
+      .populate('roleTemplateId', 'name permissions')
       .lean();
 
     if (!assignment) {
@@ -104,6 +106,23 @@ export async function PATCH(req, { params }) {
       );
     }
 
+    // Validate role template if provided
+    if (validatedData.roleTemplateId !== undefined) {
+      if (validatedData.roleTemplateId) {
+        const { RoleTemplate } = await import('@/lib/models/RoleTemplate');
+        const roleTemplate = await RoleTemplate.findById(validatedData.roleTemplateId);
+        if (!roleTemplate) {
+          return NextResponse.json(
+            { success: false, error: { code: 'INVALID_ROLE_TEMPLATE', message: 'Role template not found' } },
+            { status: 400 }
+          );
+        }
+        assignment.roleTemplateId = validatedData.roleTemplateId;
+      } else {
+        assignment.roleTemplateId = undefined;
+      }
+    }
+
     // Update fields
     if (validatedData.role !== undefined) {
       assignment.role = validatedData.role;
@@ -126,6 +145,7 @@ export async function PATCH(req, { params }) {
     // Populate for response
     await assignment.populate('siteId', 'name siteCode address location');
     await assignment.populate('assignedBy', 'firstName lastName');
+    await assignment.populate('roleTemplateId', 'name permissions');
 
     return NextResponse.json({
       success: true,

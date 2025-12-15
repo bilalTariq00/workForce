@@ -41,22 +41,27 @@ export default async function SitesPage() {
     .sort({ createdAt: -1 })
     .lean();
 
-  // Fetch all Site Managers for each site
-  // Site Managers have siteId field that references the site
+  // Fetch EmployeeSite assignments for each site (includes role templates)
+  const { EmployeeSite } = await import('@/lib/models/EmployeeSite');
+  
   const sitesWithManagers = await Promise.all(
     sites.map(async (site) => {
-      // Find all Site Managers assigned to this site
-      const siteManagers = await Employee.find({
-        role: 'site_manager',
-        siteId: site._id,
-        status: 'active',
-      })
-        .select('firstName lastName email employeeId')
-        .lean();
+      // Get all employees assigned to this site via EmployeeSite
+      const siteAssignments = await EmployeeSite.getSiteEmployees(site._id);
+      
+      // Separate Site Managers from other roles
+      const siteManagers = siteAssignments
+        .filter(assignment => assignment.role === 'site_manager')
+        .map(assignment => ({
+          ...assignment.employeeId,
+          roleTemplateId: assignment.roleTemplateId,
+          assignmentId: assignment._id,
+        }));
 
       return serializeMongoose({
         ...site,
-        siteManagers: serializeMongooseArray(siteManagers), // Add array of Site Managers
+        siteManagers: serializeMongooseArray(siteManagers),
+        allAssignments: serializeMongooseArray(siteAssignments), // All employees at site
       });
     })
   );

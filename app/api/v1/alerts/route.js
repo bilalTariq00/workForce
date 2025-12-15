@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Alert } from '@/lib/models/Alert';
 import { generateAlertsForAllSites } from '@/lib/services/alertEngine';
+import { checkPermission } from '@/lib/middleware/permissionMiddleware';
 import { z } from 'zod';
 
 /**
@@ -17,24 +18,16 @@ import { z } from 'zod';
  * - severity: Filter by severity (critical, warning, info)
  * - status: Filter by status (active, acknowledged, resolved)
  * 
- * Access: Contracts Manager, Admin only
+ * Access: Requires 'sites' module with 'view' action
  */
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission using template
+    const permissionCheck = await checkPermission('sites', 'view');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
-    // Only Contracts Managers and Admin can access
-    if (session.user.role !== 'contracts_manager' && session.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } },
-        { status: 403 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 

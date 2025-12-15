@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Tool } from '@/lib/models/Tool';
+import { checkPermission, checkModuleAccess } from '@/lib/middleware/permissionMiddleware';
 import { z } from 'zod';
 
 const toolSchema = z.object({
@@ -32,9 +33,13 @@ const toolSchema = z.object({
 // GET - List all tools with filters
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check module access
+    const permissionCheck = await checkModuleAccess('equipment');
+    if (permissionCheck.error) {
+      return NextResponse.json(
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
+      );
     }
 
     await connectDB();
@@ -83,19 +88,16 @@ export async function GET(req) {
 // POST - Create new tool
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Only HR officers and admins can create tools
-    if (!['hr_officer', 'admin'].includes(session.user.role)) {
+    // Check permission - requires 'equipment' module with 'create' action
+    const permissionCheck = await checkPermission('equipment', 'create');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { error: 'Forbidden: Only HR officers and admins can create tools' },
-        { status: 403 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     await connectDB();
 
     const body = await req.json();
@@ -105,7 +107,7 @@ export async function POST(req) {
       ...validatedData,
       availableQuantity: validatedData.totalQuantity,
       assignedQuantity: 0,
-      createdBy: session.user.id,
+      createdBy: user._id,
     });
 
     await tool.save();

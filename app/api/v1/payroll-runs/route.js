@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { PayrollRun } from '@/lib/models/PayrollRun';
 import { Timesheet } from '@/lib/models/Timesheet';
+import { checkPermission } from '@/lib/middleware/permissionMiddleware';
 import { z } from 'zod';
 
 /**
@@ -25,30 +26,16 @@ const createPayrollRunSchema = z.object({
  * - periodStart: Filter by period start
  * - periodEnd: Filter by period end
  * 
- * Access: HR Officers, Admin
+ * Access: Requires 'finance_payroll' module with 'view' action
  */
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission using template
+    const permissionCheck = await checkPermission('finance_payroll', 'view');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
-    // Only HR and Admin can access
-    if (session.user.role !== 'hr_officer' && session.user.role !== 'admin') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'FORBIDDEN',
-            message: 'Only HR Officers and Admin can access payroll runs',
-          },
-        },
-        { status: 403 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
@@ -112,28 +99,16 @@ export async function GET(req) {
  */
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission using template
+    const permissionCheck = await checkPermission('finance_payroll', 'create');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
-    // Only HR and Admin can create payroll runs
-    if (session.user.role !== 'hr_officer' && session.user.role !== 'admin') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'FORBIDDEN',
-            message: 'Only HR Officers and Admin can create payroll runs',
-          },
-        },
-        { status: 403 }
-      );
-    }
+    const user = permissionCheck.user;
 
     const body = await req.json();
     const validatedData = createPayrollRunSchema.parse(body);
@@ -198,7 +173,7 @@ export async function POST(req) {
       periodStart,
       periodEnd,
       timesheets: validatedData.timesheetIds,
-      createdBy: session.user.id,
+      createdBy: user._id.toString(),
       status: 'draft',
     });
 

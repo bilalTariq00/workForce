@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Site } from '@/lib/models/Site';
+import { checkPermission, checkModuleAccess } from '@/lib/middleware/permissionMiddleware';
 import { z } from 'zod';
 
 const createSiteSchema = z.object({
@@ -27,12 +28,12 @@ const createSiteSchema = z.object({
 // GET - List all sites
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check module access
+    const permissionCheck = await checkModuleAccess('sites');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
@@ -65,27 +66,16 @@ export async function GET(req) {
 // POST - Create new site
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission - requires 'sites' module with 'create' action
+    const permissionCheck = await checkPermission('sites', 'create');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
-    // Only HR, Admin, and Contracts Manager can create sites
-    if (
-      session.user.role !== 'hr_officer' &&
-      session.user.role !== 'admin' &&
-      session.user.role !== 'contracts_manager'
-    ) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
-        { status: 403 }
-      );
-    }
-
+    const user = permissionCheck.user;
     const body = await req.json();
     const validatedData = createSiteSchema.parse(body);
 

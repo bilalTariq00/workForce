@@ -3,7 +3,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
+import { AttendanceEvent } from '@/lib/models/AttendanceEvent';
 import { Site } from '@/lib/models/Site';
+import { SiteQRToken } from '@/lib/models/SiteQRToken';
+import { AuditLog } from '@/lib/models/AuditLog';
 import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import { validateQRCode } from '@/lib/utils/qr';
 import { findNearestSite, isWithinRadius } from '@/lib/utils/geolocation';
@@ -46,47 +49,77 @@ export async function POST(req) {
 
     await connectDB();
 
-    // Check if attendance already marked today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const existingAttendance = await Attendance.findOne({
-      employeeId: session.user.id,
-      date: {
-        $gte: today,
-        $lt: tomorrow,
-      },
-    });
-
-    if (existingAttendance) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'ALREADY_MARKED',
-            message: 'Attendance already marked for today',
-          },
-          data: {
-            attendanceId: existingAttendance._id,
-            signInTime: existingAttendance.signInTime,
-          },
-        },
-        { status: 409 }
-      );
-    }
-
-    // Find nearest active site
-    const activeSites = await Site.find({ status: 'active' }).lean();
     const userLocation = {
       latitude: validatedData.latitude,
       longitude: validatedData.longitude,
     };
 
-    const nearestSite = findNearestSite(activeSites, userLocation);
+    // Try to parse QR code as site-specific token
+    let site = null;
+    let qrToken = null;
+    
+    try {
+      const qrData = JSON.parse(validatedData.qrCode);
+      if (qrData.type === 'site_attendance' && qrData.token && qrData.siteId) {
+        // Site-specific QR code
+        qrToken = `${qrData.siteId}_${qrData.token}`;
+        site = await SiteQRToken.resolveSiteFromToken(qrToken);
+        
+        if (!site) {
+          // Log denied scan to audit log
+          await AuditLog.log({
+            userId: session.user.id,
+            action: 'denied_scan',
+            resourceType: 'attendance',
+            outcome: 'denied',
+            details: {
+              reason: 'invalid_qr_token',
+              qrToken: qrToken,
+            },
+            ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+            userAgent: req.headers.get('user-agent'),
+            method: 'POST',
+            path: '/api/v1/attendance/mark',
+          });
+          
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: 'INVALID_QR_TOKEN',
+                message: 'Invalid or expired QR code. Please scan a valid site QR code.',
+              },
+            },
+            { status: 400 }
+          );
+        }
+      }
+    } catch (e) {
+      // Not a site-specific QR, fall back to universal QR (backward compatibility)
+    }
 
-    if (!nearestSite) {
+    // If not site-specific QR, use old method (find nearest site)
+    if (!site) {
+      const activeSites = await Site.find({ status: 'active' }).lean();
+      site = findNearestSite(activeSites, userLocation);
+    }
+
+    if (!site) {
+      // Log denied scan
+      await AuditLog.log({
+        userId: session.user.id,
+        action: 'denied_scan',
+        resourceType: 'attendance',
+        outcome: 'denied',
+        details: {
+          reason: 'no_site_found',
+        },
+        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+        userAgent: req.headers.get('user-agent'),
+        method: 'POST',
+        path: '/api/v1/attendance/mark',
+      });
+      
       return NextResponse.json(
         {
           success: false,
@@ -100,14 +133,31 @@ export async function POST(req) {
     }
 
     // Validate site location
-    if (!nearestSite.location || 
-        nearestSite.location.latitude == null || 
-        nearestSite.location.longitude == null) {
-      console.error('Nearest site has invalid location:', {
-        siteId: nearestSite._id,
-        siteName: nearestSite.name,
-        location: nearestSite.location
+    if (!site.location || 
+        site.location.latitude == null || 
+        site.location.longitude == null) {
+      console.error('Site has invalid location:', {
+        siteId: site._id,
+        siteName: site.name,
+        location: site.location
       });
+      
+      // Log denied scan
+      await AuditLog.log({
+        userId: session.user.id,
+        action: 'denied_scan',
+        resourceType: 'attendance',
+        outcome: 'denied',
+        details: {
+          reason: 'invalid_site_location',
+          siteId: site._id,
+        },
+        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+        userAgent: req.headers.get('user-agent'),
+        method: 'POST',
+        path: '/api/v1/attendance/mark',
+      });
+      
       return NextResponse.json(
         {
           success: false,
@@ -123,31 +173,32 @@ export async function POST(req) {
     // Check if within geofence (or fallback to radius check)
     let isWithinGeofence = false;
     let distance = null;
+    let radiusCheck = null;
 
     // If site has a geofence configured, use it
-    if (nearestSite.geofence && nearestSite.geofence.type) {
-      isWithinGeofence = isPointInGeofence(userLocation, nearestSite.geofence);
+    if (site.geofence && site.geofence.type) {
+      isWithinGeofence = isPointInGeofence(userLocation, site.geofence);
       
       // Calculate distance for error message
-      if (nearestSite.geofence.type === 'circle') {
-        const radiusCheck = isWithinRadius(
-          nearestSite.geofence.center || nearestSite.location,
+      if (site.geofence.type === 'circle') {
+        radiusCheck = isWithinRadius(
+          site.geofence.center || site.location,
           userLocation,
-          nearestSite.geofence.radius || nearestSite.attendanceRadius
+          site.geofence.radius || site.attendanceRadius
         );
         distance = radiusCheck.distance;
       } else {
         // For polygon, calculate distance to center
-        const siteCenter = nearestSite.geofence.center || nearestSite.location;
-        const radiusCheck = isWithinRadius(siteCenter, userLocation, 1000);
+        const siteCenter = site.geofence.center || site.location;
+        radiusCheck = isWithinRadius(siteCenter, userLocation, 1000);
         distance = radiusCheck.distance;
       }
     } else {
       // Fallback to radius check (backward compatibility)
-      const radiusCheck = isWithinRadius(
-        nearestSite.location,
+      radiusCheck = isWithinRadius(
+        site.location,
         userLocation,
-        nearestSite.attendanceRadius
+        site.attendanceRadius || 50 // Default 50 meters if not set
       );
       isWithinGeofence = radiusCheck.isWithinRadius;
       distance = radiusCheck.distance;
@@ -183,17 +234,36 @@ export async function POST(req) {
         distanceDisplay = `${(distance / 1000).toFixed(1)}km`;
       }
 
-      const requiredRadius = nearestSite.geofence?.radius || nearestSite.attendanceRadius;
+      const requiredRadius = site.geofence?.radius || site.attendanceRadius;
+
+      // Log denied scan to audit log
+      await AuditLog.log({
+        userId: session.user.id,
+        action: 'denied_scan',
+        resourceType: 'attendance',
+        outcome: 'denied',
+        details: {
+          reason: 'out_of_range',
+          siteId: site._id,
+          siteName: site.name,
+          distance: distance,
+          requiredRadius: requiredRadius,
+        },
+        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+        userAgent: req.headers.get('user-agent'),
+        method: 'POST',
+        path: '/api/v1/attendance/mark',
+      });
 
       return NextResponse.json(
         {
           success: false,
           error: {
             code: 'OUT_OF_RANGE',
-            message: `You are ${distanceDisplay} away from ${nearestSite.name}. Please be within the site geofence to mark attendance.`,
+            message: `You are ${distanceDisplay} away from ${site.name}. Please be within the site geofence to mark attendance.`,
             distance: distance,
             requiredRadius: requiredRadius,
-            siteName: nearestSite.name,
+            siteName: site.name,
           },
         },
         { status: 400 }
@@ -201,7 +271,8 @@ export async function POST(req) {
     }
 
     // Check for expired certifications (Gate Access Blocking)
-    // Reuse the 'today' variable defined earlier (line 49)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const todayForCert = new Date(today);
     todayForCert.setHours(0, 0, 0, 0);
 
@@ -218,6 +289,27 @@ export async function POST(req) {
 
     if (expiredCertifications.length > 0) {
       const expiredTypes = expiredCertifications.map((cert) => cert.type).join(', ');
+      
+      // Log denied scan to audit log
+      await AuditLog.log({
+        userId: session.user.id,
+        action: 'denied_scan',
+        resourceType: 'attendance',
+        outcome: 'denied',
+        details: {
+          reason: 'certification_expired',
+          siteId: site._id,
+          expiredCertifications: expiredCertifications.map((cert) => ({
+            type: cert.type,
+            expiryDate: cert.expiryDate,
+          })),
+        },
+        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+        userAgent: req.headers.get('user-agent'),
+        method: 'POST',
+        path: '/api/v1/attendance/mark',
+      });
+      
       return NextResponse.json(
         {
           success: false,
@@ -260,30 +352,108 @@ export async function POST(req) {
       // );
     }
 
-    // Create attendance record
-    const attendance = await Attendance.create({
+    // Determine event type (IN or OUT)
+    // Check last event for this employee today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    
+    const lastEvent = await AttendanceEvent.findOne({
       employeeId: session.user.id,
-      siteId: nearestSite._id,
-      date: today,
-      signInTime: new Date(),
-      signInMethod: 'qr',
+      siteId: site._id,
+      timestamp: {
+        $gte: todayStart,
+        $lte: todayEnd,
+      },
+      isValid: true,
+    })
+      .sort({ timestamp: -1 })
+      .lean();
+    
+    // Determine event type: if last event was IN, this is OUT; otherwise IN
+    const eventType = lastEvent && lastEvent.type === 'IN' ? 'OUT' : 'IN';
+    
+    // Create attendance event
+    const attendanceEvent = await AttendanceEvent.create({
+      employeeId: session.user.id,
+      siteId: site._id,
+      timestamp: new Date(),
+      type: eventType,
       location: {
         latitude: validatedData.latitude,
         longitude: validatedData.longitude,
       },
-      distanceFromSite: radiusCheck.distance,
-      status: 'present',
+      distanceFromSite: distance,
+      isValid: true,
+      qrToken: qrToken,
+      deviceInfo: {
+        userAgent: req.headers.get('user-agent') || '',
+      },
+    });
+    
+    // Also create/update Attendance record for backward compatibility
+    let attendance = await Attendance.findOne({
+      employeeId: session.user.id,
+      siteId: site._id,
+      date: {
+        $gte: todayStart,
+        $lt: todayEnd,
+      },
+    });
+    
+    if (!attendance) {
+      // Create new attendance record
+      attendance = await Attendance.create({
+        employeeId: session.user.id,
+        siteId: site._id,
+        date: today,
+        signInTime: eventType === 'IN' ? new Date() : null,
+        signInMethod: 'qr',
+        location: {
+          latitude: validatedData.latitude,
+          longitude: validatedData.longitude,
+        },
+        distanceFromSite: distance,
+        status: 'present',
+      });
+    } else if (eventType === 'OUT' && !attendance.signOutTime) {
+      // Update attendance with sign out
+      attendance.signOutTime = new Date();
+      attendance.signOutMethod = 'qr';
+      await attendance.save();
+    }
+
+    // Log successful scan
+    await AuditLog.log({
+      userId: session.user.id,
+      action: `attendance_${eventType.toLowerCase()}`,
+      resourceType: 'attendance',
+      resourceId: attendanceEvent._id,
+      outcome: 'success',
+      details: {
+        siteId: site._id,
+        siteName: site.name,
+        eventType: eventType,
+        distance: distance,
+      },
+      ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+      userAgent: req.headers.get('user-agent'),
+      method: 'POST',
+      path: '/api/v1/attendance/mark',
     });
 
     return NextResponse.json(
       {
         success: true,
-        message: 'Attendance marked successfully',
+        message: `Attendance ${eventType} marked successfully`,
         data: {
+          eventId: attendanceEvent._id,
           attendanceId: attendance._id,
-          siteName: nearestSite.name,
-          signInTime: attendance.signInTime,
-          distance: radiusCheck.distance,
+          siteName: site.name,
+          eventType: eventType,
+          timestamp: attendanceEvent.timestamp,
+          distance: distance,
         },
       },
       { status: 201 }

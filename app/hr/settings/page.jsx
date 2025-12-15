@@ -1,8 +1,10 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Settings, User, Bell, Shield, Database } from 'lucide-react';
 
 export default async function SettingsPage() {
@@ -83,9 +85,17 @@ export default async function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Security settings will be available soon.
-              </p>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Manage role-based permissions and access control.
+                </p>
+                <Link href="/hr/settings/permission-templates">
+                  <Button variant="outline" className="w-full">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Permission Templates
+                  </Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
 

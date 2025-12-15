@@ -67,6 +67,7 @@ const defaultTemplates = [
       { module: 'timesheets', actions: ['view', 'approve', 'export'] },
       { module: 'finance_payroll', actions: ['view', 'create', 'edit', 'export'] },
       { module: 'leave_requests', actions: ['view', 'approve'] },
+      { module: 'sites', actions: ['view', 'create', 'edit', 'delete', 'manage'] },
       { module: 'reports', actions: ['view', 'export'] },
     ],
   },

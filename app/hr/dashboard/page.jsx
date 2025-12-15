@@ -10,7 +10,7 @@ import DashboardStats from '@/components/hr/DashboardStats';
 import EmployeeList from '@/components/hr/EmployeeList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Shield, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { serializeMongooseArray } from '@/lib/utils/serialize';
 import { checkModuleAccessServer } from '@/lib/utils/checkModuleAccessServer';
@@ -82,6 +82,38 @@ export default async function HRDashboard() {
 
         {/* Stats Cards */}
         <DashboardStats stats={stats} />
+
+        {/* Quick Actions */}
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Link href="/hr/create-employee">
+                <Button variant="outline" className="w-full h-auto py-3">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Create Employee
+                </Button>
+              </Link>
+              <Link href="/admin/role-templates">
+                <Button variant="outline" className="w-full h-auto py-3 border-primary/30 hover:bg-primary/5">
+                  <Shield className="h-4 w-4 mr-2 text-primary" />
+                  Manage Role Templates
+                </Button>
+              </Link>
+              <Link href="/hr/settings">
+                <Button variant="outline" className="w-full h-auto py-3">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Employee List */}
         <Card>

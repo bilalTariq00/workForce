@@ -8,6 +8,7 @@ import {
   generateTimesheetsForWeek,
   generateCurrentWeekTimesheet,
 } from '@/lib/services/timesheetGenerator';
+import { checkPermission, checkModuleAccess } from '@/lib/middleware/permissionMiddleware';
 import { z } from 'zod';
 
 /**
@@ -20,19 +21,20 @@ import { z } from 'zod';
  * - weekStartDate: Filter by week start date
  * - status: Filter by status (draft, submitted, approved, locked)
  * 
- * Access: HR, Admin (all timesheets), Employees (their own timesheets)
+ * Access: Requires 'timesheets' module with 'view' action
  */
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission using template
+    const permissionCheck = await checkPermission('timesheets', 'view');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -42,15 +44,19 @@ export async function GET(req) {
 
     const query = {};
 
-    // Employees can only see their own timesheets
-    if (session.user.role === 'labour') {
-      query.employeeId = session.user.id;
+    // Check if user can only view their own timesheets (labour role typically)
+    // If user doesn't have 'manage' permission, they can only see their own
+    const { hasPermission } = await import('@/lib/utils/permissions');
+    const canManage = hasPermission(user, 'timesheets', 'manage') || user.role === 'admin';
+    
+    if (!canManage) {
+      query.employeeId = user._id;
     }
 
     // Apply filters
     if (employeeId) {
-      // HR and Admin can filter by any employee
-      if (session.user.role === 'hr_officer' || session.user.role === 'admin') {
+      // Only users with manage permission can filter by any employee
+      if (canManage) {
         query.employeeId = employeeId;
       }
     }

@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { LeaveRequest } from '@/lib/models/LeaveRequest';
 import { Employee } from '@/lib/models/Employee';
+import { checkPermission, checkModuleAccess } from '@/lib/middleware/permissionMiddleware';
+import { hasPermission } from '@/lib/utils/permissions';
 import { z } from 'zod';
 
 /**
@@ -35,15 +37,16 @@ const createLeaveRequestSchema = z.object({
  */
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check module access
+    const permissionCheck = await checkModuleAccess('leave_requests');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -55,15 +58,17 @@ export async function GET(req) {
 
     const query = {};
 
-    // Employees can only see their own requests
-    if (session.user.role === 'labour' || session.user.role === 'site_manager') {
-      query.employeeId = session.user.id;
+    // Check if user can only see their own requests
+    const canManage = hasPermission(user, 'leave_requests', 'manage') || user.role === 'admin';
+    
+    if (!canManage) {
+      query.employeeId = user._id;
     }
 
     // Apply filters
     if (employeeId) {
-      // Only HR/Admin can filter by other employees
-      if (session.user.role === 'hr_officer' || session.user.role === 'admin') {
+      // Only users with manage permission can filter by other employees
+      if (canManage) {
         query.employeeId = employeeId;
       }
     }
@@ -128,15 +133,16 @@ export async function GET(req) {
  */
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission - requires 'leave_requests' module with 'create' action
+    const permissionCheck = await checkPermission('leave_requests', 'create');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     const body = await req.json();
     const validatedData = createLeaveRequestSchema.parse(body);
 
@@ -177,7 +183,7 @@ export async function POST(req) {
 
     // Check for overlapping approved leave
     const hasOverlap = await LeaveRequest.hasOverlappingLeave(
-      session.user.id,
+      user._id,
       startDate,
       endDate
     );
@@ -197,7 +203,7 @@ export async function POST(req) {
 
     // For annual leave, check balance
     if (validatedData.type === 'annual') {
-      const employee = await Employee.findById(session.user.id).lean();
+      const employee = await Employee.findById(user._id).lean();
       if (!employee) {
         return NextResponse.json(
           {
@@ -238,7 +244,7 @@ export async function POST(req) {
 
     // Create leave request
     const leaveRequest = await LeaveRequest.create({
-      employeeId: session.user.id,
+      employeeId: user._id,
       type: validatedData.type,
       startDate,
       endDate,

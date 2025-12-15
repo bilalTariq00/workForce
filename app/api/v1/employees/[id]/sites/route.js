@@ -11,6 +11,7 @@ import { z } from 'zod';
 const assignSiteSchema = z.object({
   siteId: z.string().min(1, 'Site ID is required'),
   role: z.enum(['labour', 'site_manager', 'contracts_manager', 'hr_officer', 'ehs_officer', 'admin']),
+  roleTemplateId: z.string().optional(), // Optional role template for this site assignment
   isPrimary: z.boolean().optional().default(false),
   notes: z.string().max(500).optional(),
 });
@@ -116,6 +117,18 @@ export async function POST(req, { params }) {
       );
     }
 
+    // Validate role template if provided
+    if (validatedData.roleTemplateId) {
+      const { RoleTemplate } = await import('@/lib/models/RoleTemplate');
+      const roleTemplate = await RoleTemplate.findById(validatedData.roleTemplateId);
+      if (!roleTemplate) {
+        return NextResponse.json(
+          { success: false, error: { code: 'INVALID_ROLE_TEMPLATE', message: 'Role template not found' } },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if assignment already exists
     const existingAssignment = await EmployeeSite.findOne({
       employeeId,
@@ -135,6 +148,7 @@ export async function POST(req, { params }) {
       employeeId,
       siteId: validatedData.siteId,
       role: validatedData.role,
+      roleTemplateId: validatedData.roleTemplateId || undefined,
       isPrimary: validatedData.isPrimary,
       assignedBy: session.user.id,
       notes: validatedData.notes,
@@ -148,6 +162,7 @@ export async function POST(req, { params }) {
     // Populate for response
     await assignment.populate('siteId', 'name siteCode address location');
     await assignment.populate('assignedBy', 'firstName lastName');
+    await assignment.populate('roleTemplateId', 'name permissions');
 
     return NextResponse.json(
       {

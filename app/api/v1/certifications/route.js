@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import { Employee } from '@/lib/models/Employee';
+import { checkPermission, checkModuleAccess } from '@/lib/middleware/permissionMiddleware';
+import { hasPermission } from '@/lib/utils/permissions';
 import { z } from 'zod';
 
 /**
@@ -54,15 +56,16 @@ const createCertificationSchema = z.object({
  */
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check module access
+    const permissionCheck = await checkModuleAccess('certifications');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -73,15 +76,17 @@ export async function GET(req) {
 
     const query = {};
 
-    // Employees can only see their own certifications
-    if (session.user.role === 'labour') {
-      query.employeeId = session.user.id;
+    // Check if user can only view their own certifications
+    const canManage = hasPermission(user, 'certifications', 'manage') || user.role === 'admin';
+    
+    if (!canManage) {
+      query.employeeId = user._id;
     }
 
     // Apply filters
     if (employeeId) {
-      // Only HR/EHS/Admin can filter by other employees
-      if (['hr_officer', 'ehs_officer', 'admin'].includes(session.user.role)) {
+      // Only users with manage permission can filter by other employees
+      if (canManage) {
         query.employeeId = employeeId;
       }
     }
@@ -147,15 +152,16 @@ export async function GET(req) {
  */
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check permission - requires 'certifications' module with 'create' action
+    const permissionCheck = await checkPermission('certifications', 'create');
+    if (permissionCheck.error) {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
+        { success: false, error: permissionCheck.error },
+        { status: permissionCheck.status }
       );
     }
 
+    const user = permissionCheck.user;
     const body = await req.json();
     const validatedData = createCertificationSchema.parse(body);
 
@@ -180,10 +186,11 @@ export async function POST(req) {
     }
 
     // Determine employeeId - employees can only create for themselves
-    let targetEmployeeId = session.user.id;
+    let targetEmployeeId = user._id;
     
-    // HR/EHS/Admin can create for other employees if employeeId is provided
-    if (['hr_officer', 'ehs_officer', 'admin'].includes(session.user.role) && body.employeeId) {
+    // Users with manage permission can create for other employees if employeeId is provided
+    const canManage = hasPermission(user, 'certifications', 'manage') || user.role === 'admin';
+    if (canManage && body.employeeId) {
       targetEmployeeId = body.employeeId;
     }
 
@@ -214,7 +221,7 @@ export async function POST(req) {
       status: 'pending_validation',
       notes: validatedData.notes,
       uploadMethod: validatedData.uploadMethod || 'file',
-      uploadedBy: session.user.id,
+      uploadedBy: user._id,
     });
 
     // Populate employee info

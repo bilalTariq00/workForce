@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { filterMenuItemsByPermissions } from '@/lib/utils/navigation';
 
 /**
  * Site Manager Dashboard Layout
@@ -37,7 +38,7 @@ export default function SiteManagerLayout({ children, siteName }) {
   const pathname = usePathname();
 
   // Site Manager menu items - only essential tabs
-  const menuItems = [
+  const allMenuItems = [
     {
       title: 'Dashboard',
       icon: LayoutDashboard,
@@ -58,10 +59,26 @@ export default function SiteManagerLayout({ children, siteName }) {
       icon: Calendar,
       href: '/site-manager/attendance-verification',
     },
-  ].map(item => ({
-    ...item,
-    active: pathname === item.href || (item.href === '/site-manager/daily-logs' && pathname.startsWith('/site-manager/daily-logs')),
-  }));
+  ];
+
+  // Filter menu items based on user permissions
+  const menuItems = useMemo(() => {
+    if (!session?.user) return allMenuItems;
+
+    // Create user object for permission checking
+    const user = {
+      role: session.user.role,
+      roleTemplateId: session.user.roleTemplateId,
+      purchasedModules: session.user.purchasedModules || [],
+    };
+
+    const filtered = filterMenuItemsByPermissions(allMenuItems, user);
+    
+    return filtered.map(item => ({
+      ...item,
+      active: pathname === item.href || (item.href === '/site-manager/daily-logs' && pathname.startsWith('/site-manager/daily-logs')),
+    }));
+  }, [session, pathname]);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' });

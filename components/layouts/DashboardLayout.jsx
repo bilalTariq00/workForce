@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -20,6 +20,7 @@ import {
   Award,
   Wrench,
   MessageSquare,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -29,20 +30,32 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { filterMenuItemsByPermissions } from '@/lib/utils/navigation';
 
 export default function DashboardLayout({ children }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
-  const menuItems = [
+  // Ensure we're on client side to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Define all menu items
+  const allMenuItems = [
     {
       title: 'Dashboard',
       icon: LayoutDashboard,
       href: '/hr/dashboard',
     },
-   
+    {
+      title: 'Role Templates',
+      icon: Shield,
+      href: '/admin/role-templates',
+    },
     {
       title: 'Sites',
       icon: Building2,
@@ -93,10 +106,68 @@ export default function DashboardLayout({ children }) {
       icon: Settings,
       href: '/hr/settings',
     },
-  ].map(item => ({
-    ...item,
-    active: pathname === item.href || pathname.startsWith(item.href + '/'),
-  }));
+  ];
+
+  // Filter menu items based on user permissions
+  const menuItems = useMemo(() => {
+    // During SSR or before mount, return all items to match server render
+    // But ensure Role Templates is always included if user might be admin/hr_officer
+    if (!mounted || status === 'loading' || !session?.user) {
+      const items = allMenuItems.map(item => ({
+        ...item,
+        active: pathname === item.href || pathname.startsWith(item.href + '/'),
+      }));
+      return items;
+    }
+
+    // Create user object for permission checking
+    // Use stable references to prevent unnecessary re-renders
+    const user = {
+      role: session.user.role,
+      roleTemplateId: session.user.roleTemplateId,
+      purchasedModules: session.user.purchasedModules || [],
+    };
+
+    const userRole = user.role || session?.user?.role;
+    
+    // Filter menu items
+    let filtered = filterMenuItemsByPermissions(allMenuItems, user);
+    
+    // ALWAYS ensure Role Templates is shown for admin and hr_officer
+    // This is a critical menu item that should never be filtered out for these roles
+    const roleTemplatesItem = allMenuItems.find(item => item.href === '/admin/role-templates');
+    
+    if (roleTemplatesItem && (userRole === 'admin' || userRole === 'hr_officer')) {
+      // Remove any existing instance first (in case filter already included it or removed it)
+      filtered = filtered.filter(item => item.href !== '/admin/role-templates');
+      // Always add it at the end for admin/hr_officer - this ensures it's visible
+      filtered.push({
+        ...roleTemplatesItem,
+        title: 'Role Templates',
+        icon: Shield,
+        href: '/admin/role-templates',
+      });
+    }
+    
+    const finalItems = filtered.map(item => ({
+      ...item,
+      active: pathname === item.href || pathname.startsWith(item.href + '/'),
+    }));
+
+    // Debug: Log menu items (remove in production)
+    if (process.env.NODE_ENV === 'development') {
+      const hasRoleTemplates = finalItems.some(item => item.href === '/admin/role-templates');
+      if (!hasRoleTemplates && (userRole === 'admin' || userRole === 'hr_officer')) {
+        console.warn('[DashboardLayout] Role Templates missing from menu items!', {
+          userRole,
+          menuItemsCount: finalItems.length,
+          menuHrefs: finalItems.map(m => m.href),
+        });
+      }
+    }
+
+    return finalItems;
+  }, [mounted, status, session?.user?.role, session?.user?.roleTemplateId, session?.user?.purchasedModules, pathname]);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' });

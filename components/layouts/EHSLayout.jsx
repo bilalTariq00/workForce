@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { filterMenuItemsByPermissions } from '@/lib/utils/navigation';
 
 export default function EHSLayout({ children }) {
   const { data: session } = useSession();
@@ -42,7 +43,7 @@ export default function EHSLayout({ children }) {
   };
 
   // Main navigation items organized by category
-  const mainMenuItems = markActive([
+  const allMainMenuItems = [
     {
       title: 'Dashboard',
       icon: LayoutDashboard,
@@ -55,9 +56,9 @@ export default function EHSLayout({ children }) {
       href: '/chat',
       description: 'Real-time chat',
     },
-  ]);
+  ];
 
-  const safetyMenuItems = markActive([
+  const allSafetyMenuItems = [
     {
       title: 'Incidents',
       icon: AlertTriangle,
@@ -70,9 +71,9 @@ export default function EHSLayout({ children }) {
       href: '/ehs/inspections',
       description: 'Site inspections & audits',
     },
-  ]);
+  ];
 
-  const complianceMenuItems = markActive([
+  const allComplianceMenuItems = [
     {
       title: 'Training',
       icon: GraduationCap,
@@ -85,14 +86,53 @@ export default function EHSLayout({ children }) {
       href: '/hr/certifications',
       description: 'Validate certifications',
     },
-  ]);
-
-  // Combine all menu items for collapsed view
-  const allMenuItems = [
-    ...mainMenuItems,
-    ...safetyMenuItems,
-    ...complianceMenuItems,
   ];
+
+  // Filter menu items based on user permissions
+  const filteredMenuItems = useMemo(() => {
+    const markActive = (items) => {
+      return items.map(item => ({
+        ...item,
+        active: pathname === item.href || pathname.startsWith(item.href + '/'),
+      }));
+    };
+
+    if (!session?.user) {
+      return {
+        main: markActive(allMainMenuItems),
+        safety: markActive(allSafetyMenuItems),
+        compliance: markActive(allComplianceMenuItems),
+        all: markActive([...allMainMenuItems, ...allSafetyMenuItems, ...allComplianceMenuItems]),
+      };
+    }
+
+    // Create user object for permission checking
+    const user = {
+      role: session.user.role,
+      roleTemplateId: session.user.roleTemplateId,
+      purchasedModules: session.user.purchasedModules || [],
+    };
+
+    const allItems = [...allMainMenuItems, ...allSafetyMenuItems, ...allComplianceMenuItems];
+    const filtered = filterMenuItemsByPermissions(allItems, user);
+    
+    // Separate back into categories
+    const main = filtered.filter(item => allMainMenuItems.some(m => m.href === item.href));
+    const safety = filtered.filter(item => allSafetyMenuItems.some(s => s.href === item.href));
+    const compliance = filtered.filter(item => allComplianceMenuItems.some(c => c.href === item.href));
+    
+    return {
+      main: markActive(main),
+      safety: markActive(safety),
+      compliance: markActive(compliance),
+      all: markActive(filtered),
+    };
+  }, [session, pathname]);
+
+  const mainMenuItems = filteredMenuItems.main;
+  const safetyMenuItems = filteredMenuItems.safety;
+  const complianceMenuItems = filteredMenuItems.compliance;
+  const allMenuItems = filteredMenuItems.all;
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' });
