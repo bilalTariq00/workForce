@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { QrCode, MapPin, AlertCircle, CheckCircle2, Loader, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ const UNIVERSAL_QR_CODE = JSON.stringify({
 
 export default function AttendanceScanPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -32,6 +33,29 @@ export default function AttendanceScanPage() {
   const scannerRef = useRef(null);
   const videoRef = useRef(null);
   const qrCodeRegionId = 'qr-reader';
+
+  // Check for QR data in URL parameters (from QR token route)
+  useEffect(() => {
+    const qrParam = searchParams?.get('qr');
+    if (qrParam && location) {
+      try {
+        const qrData = JSON.parse(decodeURIComponent(qrParam));
+        // Auto-process the QR code
+        handleQRScan(JSON.stringify(qrData));
+      } catch (err) {
+        console.error('Error parsing QR from URL:', err);
+      }
+    } else if (qrParam) {
+      // Store for later processing when location is available
+      try {
+        const qrData = JSON.parse(decodeURIComponent(qrParam));
+        setManualQR(JSON.stringify(qrData));
+      } catch (err) {
+        console.error('Error parsing QR from URL:', err);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, location]);
 
   // Check if attendance already marked
   useEffect(() => {

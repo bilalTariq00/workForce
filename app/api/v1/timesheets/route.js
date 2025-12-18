@@ -8,6 +8,7 @@ import {
   generateTimesheetsForWeek,
   generateCurrentWeekTimesheet,
 } from '@/lib/services/timesheetGenerator';
+import { AttendanceEvent } from '@/lib/models/AttendanceEvent';
 import { checkPermission, checkModuleAccess } from '@/lib/middleware/permissionMiddleware';
 import { z } from 'zod';
 
@@ -41,6 +42,7 @@ export async function GET(req) {
     const employeeId = searchParams.get('employeeId');
     const weekStartDate = searchParams.get('weekStartDate');
     const status = searchParams.get('status');
+    const siteIds = searchParams.get('siteIds'); // Comma-separated list of site IDs
 
     const query = {};
 
@@ -72,12 +74,24 @@ export async function GET(req) {
     }
 
     // Fetch timesheets with populated references
-    const timesheets = await Timesheet.find(query)
+    let timesheets = await Timesheet.find(query)
       .populate('employeeId', 'firstName lastName employeeId email payRate')
       .populate('approvedBy', 'firstName lastName')
       .populate('lockedBy', 'firstName lastName')
+      .populate('hours.siteId', 'name siteCode')
       .sort({ weekStartDate: -1, createdAt: -1 })
       .lean();
+
+    // Filter by site IDs if provided (for site manager view)
+    if (siteIds) {
+      const siteIdArray = siteIds.split(',').map(id => id.trim());
+      timesheets = timesheets.filter(timesheet => {
+        // Check if any day in the timesheet has a siteId in the filter list
+        return timesheet.hours?.some(day => 
+          day.siteId && siteIdArray.includes(day.siteId._id?.toString() || day.siteId.toString())
+        );
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -170,10 +184,10 @@ export async function POST(req) {
         );
       }
 
-      const timesheets = await generateTimesheetsForWeek(targetDate);
-      result = { timesheets, count: timesheets.length };
+      const { timesheets, errors } = await generateTimesheetsForWeek(targetDate, 'QR');
+      result = { timesheets, count: timesheets.length, errors: errors.length > 0 ? errors : undefined };
     } else {
-      const timesheet = await generateTimesheetForEmployee(targetEmployeeId, targetDate);
+      const timesheet = await generateTimesheetForEmployee(targetEmployeeId, targetDate, 'QR');
       result = { timesheet };
     }
 

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trash2, Edit, MapPin, Building2, User, UserPlus, List, Map } from 'lucide-react';
+import { Trash2, Edit, MapPin, Building2, User, UserPlus, List, Map, QrCode, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CreateSiteForm from './CreateSiteForm';
 import AssignSiteManagerModal from './AssignSiteManagerModal';
 import EditSiteModal from './EditSiteModal';
 import SitesMapView from './SitesMapView';
+import SiteQRManager from './SiteQRManager';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -26,6 +27,7 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
   const [assignModalSite, setAssignModalSite] = useState(null);
   const [editingSite, setEditingSite] = useState(null);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [updatingRadiusId, setUpdatingRadiusId] = useState(null);
 
   // Sync sites with initialSites when it changes
   useEffect(() => {
@@ -109,6 +111,41 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
     router.refresh();
   };
 
+  /**
+   * Handle radius update
+   */
+  const handleRadiusUpdate = async (siteId, newRadius) => {
+    setUpdatingRadiusId(siteId);
+    try {
+      const response = await fetch(`/api/v1/sites/${siteId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attendanceRadius: newRadius,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update local state
+        setSites(sites.map(site => 
+          site._id === siteId 
+            ? { ...site, attendanceRadius: newRadius }
+            : site
+        ));
+      } else {
+        alert(result.error?.message || 'Failed to update radius');
+      }
+    } catch (err) {
+      alert('An error occurred while updating radius');
+    } finally {
+      setUpdatingRadiusId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {isCreateModalOpen && (
@@ -189,6 +226,7 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
                           <p className="text-xs text-gray-500 mt-1">{site.siteCode}</p>
                         </div>
                         <div className="flex gap-2">
+                          <SiteQRManager siteId={site._id} siteName={site.name} />
                           <button
                             onClick={() => setEditingSite(site)}
                             className="text-green-600 hover:text-green-800 p-1"
@@ -227,9 +265,12 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
                             </span>
                           </div>
                         )}
-                        <div className="mt-2">
+                        <div className="mt-2 flex items-center gap-2">
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(site.status)}`}>
                             {formatStatus(site.status)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Radius: {site.attendanceRadius || 50}m
                           </span>
                         </div>
                       </div>
@@ -298,11 +339,27 @@ export default function SiteList({ initialSites, allSiteManagers = [] }) {
                             {formatStatus(site.status)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {site.attendanceRadius}m
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={site.attendanceRadius || 50}
+                              onChange={(e) => handleRadiusUpdate(site._id, parseInt(e.target.value))}
+                              disabled={updatingRadiusId === site._id}
+                              className="text-sm border rounded px-2 py-1 disabled:opacity-50"
+                              title="Attendance radius in meters"
+                            >
+                              <option value={20}>20m</option>
+                              <option value={50}>50m</option>
+                              <option value={100}>100m</option>
+                            </select>
+                            {updatingRadiusId === site._id && (
+                              <span className="text-xs text-gray-500">Updating...</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end gap-3">
+                            <SiteQRManager siteId={site._id} siteName={site.name} />
                             <button
                               onClick={() => setEditingSite(site)}
                               className="text-green-600 hover:text-green-900"

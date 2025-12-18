@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,8 +21,10 @@ import {
   Calendar,
   User,
   Clock,
+  Edit,
 } from 'lucide-react';
 import Link from 'next/link';
+import TimesheetAdjustmentModal from './TimesheetAdjustmentModal';
 
 /**
  * Timesheet Detail Client Component
@@ -30,12 +33,15 @@ import Link from 'next/link';
  */
 export default function TimesheetDetailClient({ timesheetId }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [timesheet, setTimesheet] = useState(null);
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [adjustmentDayIndex, setAdjustmentDayIndex] = useState(null);
 
   // Fetch timesheet
   useEffect(() => {
@@ -255,6 +261,9 @@ export default function TimesheetDetailClient({ timesheetId }) {
                 <TableHead>Hours</TableHead>
                 <TableHead>Site</TableHead>
                 <TableHead>Attendance</TableHead>
+                {timesheet.status !== 'locked' && (session?.user?.role === 'hr_officer' || session?.user?.role === 'admin') && (
+                  <TableHead>Actions</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -272,6 +281,21 @@ export default function TimesheetDetailClient({ timesheetId }) {
                       <span className="text-xs text-muted-foreground">No attendance</span>
                     )}
                   </TableCell>
+                  {timesheet.status !== 'locked' && (session?.user?.role === 'hr_officer' || session?.user?.role === 'admin') && (
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setAdjustmentDayIndex(index);
+                          setAdjustmentModalOpen(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Adjust
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -356,6 +380,24 @@ export default function TimesheetDetailClient({ timesheetId }) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Adjustment Modal */}
+      {timesheet && adjustmentDayIndex !== null && (
+        <TimesheetAdjustmentModal
+          isOpen={adjustmentModalOpen}
+          onClose={() => {
+            setAdjustmentModalOpen(false);
+            setAdjustmentDayIndex(null);
+          }}
+          timesheet={timesheet}
+          dayIndex={adjustmentDayIndex}
+          onAdjust={(updatedTimesheet) => {
+            setTimesheet(updatedTimesheet);
+            setSuccess('Timesheet adjusted successfully');
+            setTimeout(() => setSuccess(''), 5000);
+          }}
+        />
       )}
     </div>
   );

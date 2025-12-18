@@ -3,21 +3,29 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { PayrollRun } from '@/lib/models/PayrollRun';
-import { calculatePayrollForTimesheets } from '@/lib/services/payrollCalculator';
-import { exportToSageCSV, exportToSageJSON } from '@/lib/services/sageExport';
+import { exportPayrollToCSV, exportPayrollToJSON } from '@/lib/services/payrollExport';
 import mongoose from 'mongoose';
 
 /**
+ * GET /api/v1/payroll-runs/[id]/export
  * POST /api/v1/payroll-runs/[id]/export
  * 
- * Export payroll run to Sage format
+ * Export payroll run to CSV or JSON format
  * 
  * Query parameters:
  * - format: csv or json (default: csv)
  * 
  * Access: HR Officers, Admin
  */
+export async function GET(req, { params }) {
+  return handleExport(req, params);
+}
+
 export async function POST(req, { params }) {
+  return handleExport(req, params);
+}
+
+async function handleExport(req, { params }) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -89,20 +97,18 @@ export async function POST(req, { params }) {
     const { searchParams } = new URL(req.url);
     const format = searchParams.get('format') || 'csv';
 
-    // Calculate payroll data
-    const payrollData = await calculatePayrollForTimesheets(payrollRun.timesheets);
-
     // Export based on format
     let exportData;
     let contentType;
     let fileName;
 
     if (format === 'json') {
-      exportData = exportToSageJSON(payrollData, payrollRun);
+      const jsonData = await exportPayrollToJSON(payrollRun._id);
+      exportData = JSON.stringify(jsonData, null, 2);
       contentType = 'application/json';
       fileName = `payroll-${payrollRun._id}-${formatDateForFilename(payrollRun.periodStart)}.json`;
     } else {
-      exportData = exportToSageCSV(payrollData, payrollRun);
+      exportData = await exportPayrollToCSV(payrollRun._id);
       contentType = 'text/csv';
       fileName = `payroll-${payrollRun._id}-${formatDateForFilename(payrollRun.periodStart)}.csv`;
     }

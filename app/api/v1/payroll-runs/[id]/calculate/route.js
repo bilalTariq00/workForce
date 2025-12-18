@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { connectDB } from '@/lib/db/mongodb';
 import { PayrollRun } from '@/lib/models/PayrollRun';
-import { calculatePayrollForTimesheets } from '@/lib/services/payrollCalculator';
+import { calculatePayrollForRun } from '@/lib/services/payrollCalculator';
 import mongoose from 'mongoose';
 
 /**
@@ -81,12 +81,13 @@ export async function POST(req, { params }) {
       );
     }
 
-    // Calculate payroll
-    await payrollRun.calculate();
+    // Calculate payroll using new calculator
+    const result = await calculatePayrollForRun(payrollRun._id);
 
     const populated = await PayrollRun.findById(payrollRun._id)
       .populate('createdBy', 'firstName lastName email')
       .populate('employees', 'firstName lastName employeeId')
+      .populate('payrollItems')
       .lean();
 
     return NextResponse.json({

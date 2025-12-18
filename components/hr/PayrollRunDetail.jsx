@@ -51,7 +51,21 @@ export default function PayrollRunDetail({ payrollRunId }) {
 
   const fetchCalculations = async (payrollRunData) => {
     try {
-      // Calculate from the timesheets in the payroll run
+      // Use PayrollItems if available (from new calculation system)
+      if (payrollRunData.payrollItems && payrollRunData.payrollItems.length > 0) {
+        setPayrollCalculations({
+          calculations: payrollRunData.payrollItems,
+          totals: {
+            gross: payrollRunData.totalGross || 0,
+            net: payrollRunData.totalNet || 0,
+            tax: payrollRunData.totalTax || 0,
+            deductions: payrollRunData.totalDeductions || 0,
+          },
+        });
+        return;
+      }
+
+      // Fallback: Calculate from timesheets (legacy)
       const calculations = [];
       let totalGross = 0;
       let totalNet = 0;
@@ -262,7 +276,7 @@ export default function PayrollRunDetail({ payrollRunId }) {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -278,7 +292,7 @@ export default function PayrollRunDetail({ payrollRunId }) {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Tax
+              PAYE Tax
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -290,12 +304,24 @@ export default function PayrollRunDetail({ payrollRunId }) {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Deductions
+              NI (Employee)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              £{payrollRun.totalDeductions?.toFixed(2) || '0.00'}
+              £{payrollRun.payrollItems?.reduce((sum, item) => sum + (item.nationalInsurance?.employee?.total || 0), 0).toFixed(2) || '0.00'}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              NI (Employer)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              £{payrollRun.payrollItems?.reduce((sum, item) => sum + (item.nationalInsurance?.employer?.total || 0), 0).toFixed(2) || '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -308,6 +334,18 @@ export default function PayrollRunDetail({ payrollRunId }) {
           <CardContent>
             <div className="text-2xl font-bold text-primary">
               £{payrollRun.totalNet?.toFixed(2) || '0.00'}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Employer Cost
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              £{payrollRun.payrollItems?.reduce((sum, item) => sum + (item.employerCost || 0), 0).toFixed(2) || '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -324,34 +362,102 @@ export default function PayrollRunDetail({ payrollRunId }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Hours</TableHead>
+                    <TableHead className="sticky left-0 bg-background z-10">Employee</TableHead>
+                    <TableHead>Hours (Reg/OT)</TableHead>
                     <TableHead>Pay Rate</TableHead>
-                    <TableHead>Gross</TableHead>
-                    <TableHead>Tax</TableHead>
-                    <TableHead>Deductions</TableHead>
-                    <TableHead>Net</TableHead>
+                    <TableHead>Gross (Reg/OT)</TableHead>
+                    <TableHead>PAYE Tax</TableHead>
+                    <TableHead>NI (EE)</TableHead>
+                    <TableHead>NI (ER)</TableHead>
+                    <TableHead>Pension (EE)</TableHead>
+                    <TableHead>Pension (ER)</TableHead>
+                    <TableHead>Student Loan</TableHead>
+                    <TableHead>Other Ded.</TableHead>
+                    <TableHead className="font-semibold">Net Pay</TableHead>
+                    <TableHead className="font-semibold text-orange-600">Employer Cost</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payrollCalculations.calculations.map((calc, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{calc.employeeName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {calc.employeeIdNumber}
+                  {payrollCalculations.calculations.map((item, index) => {
+                    // Handle both PayrollItem format and legacy format
+                    const isPayrollItem = item.grossPay !== undefined;
+                    const employee = isPayrollItem ? item.employeeId : null;
+                    const employeeName = isPayrollItem 
+                      ? `${employee?.firstName || ''} ${employee?.lastName || ''}`.trim()
+                      : item.employeeName;
+                    const employeeIdNumber = isPayrollItem ? employee?.employeeId : item.employeeIdNumber;
+                    
+                    const hours = isPayrollItem ? item.hours : { total: item.hours, regular: item.hours, overtime: 0 };
+                    const payRates = isPayrollItem ? item.payRates : { regular: item.payRate, overtime: 0 };
+                    const grossPay = isPayrollItem ? item.grossPay : { total: item.gross, regular: item.gross, overtime: 0 };
+                    const tax = isPayrollItem ? item.tax?.total || 0 : item.tax || 0;
+                    const niEmployee = isPayrollItem ? item.nationalInsurance?.employee?.total || 0 : 0;
+                    const niEmployer = isPayrollItem ? item.nationalInsurance?.employer?.total || 0 : 0;
+                    const pensionEmployee = isPayrollItem ? item.pension?.employee?.amount || 0 : 0;
+                    const pensionEmployer = isPayrollItem ? item.pension?.employer?.amount || 0 : 0;
+                    const studentLoan = isPayrollItem ? item.studentLoan?.amount || 0 : 0;
+                    const otherDeductions = isPayrollItem 
+                      ? (item.otherDeductions || []).reduce((sum, d) => sum + (d.amount || 0), 0)
+                      : (item.deductions || 0) - tax - niEmployee - pensionEmployee - studentLoan;
+                    const net = isPayrollItem ? item.netPay || 0 : item.net || 0;
+                    const employerCost = isPayrollItem ? item.employerCost || 0 : grossPay.total + niEmployer + pensionEmployer;
+
+                    return (
+                      <TableRow key={index}>
+                        <TableCell className="sticky left-0 bg-background z-10">
+                          <div>
+                            <div className="font-medium">{employeeName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {employeeIdNumber}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{calc.hours}</TableCell>
-                      <TableCell>£{calc.payRate.toFixed(2)}</TableCell>
-                      <TableCell>£{calc.gross.toFixed(2)}</TableCell>
-                      <TableCell>£{calc.tax.toFixed(2)}</TableCell>
-                      <TableCell>£{calc.deductions.toFixed(2)}</TableCell>
-                      <TableCell className="font-semibold">£{calc.net.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{hours.total?.toFixed(2) || hours.total}h</div>
+                            {hours.overtime > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                {hours.regular?.toFixed(2) || hours.regular}h / {hours.overtime?.toFixed(2) || hours.overtime}h OT
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            £{payRates.regular?.toFixed(2) || payRates.regular}
+                            {payRates.overtime > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                OT: £{payRates.overtime.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            £{grossPay.total?.toFixed(2) || grossPay.total}
+                            {grossPay.overtime > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                £{grossPay.regular?.toFixed(2) || grossPay.regular} / £{grossPay.overtime?.toFixed(2) || grossPay.overtime} OT
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>£{tax.toFixed(2)}</TableCell>
+                        <TableCell>£{niEmployee.toFixed(2)}</TableCell>
+                        <TableCell>£{niEmployer.toFixed(2)}</TableCell>
+                        <TableCell>£{pensionEmployee.toFixed(2)}</TableCell>
+                        <TableCell>£{pensionEmployer.toFixed(2)}</TableCell>
+                        <TableCell>
+                          {studentLoan > 0 ? `£${studentLoan.toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {otherDeductions > 0 ? `£${otherDeductions.toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell className="font-semibold">£{net.toFixed(2)}</TableCell>
+                        <TableCell className="font-semibold text-orange-600">£{employerCost.toFixed(2)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

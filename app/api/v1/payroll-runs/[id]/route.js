@@ -62,6 +62,13 @@ export async function GET(req, { params }) {
           select: 'firstName lastName employeeId payRate',
         },
       })
+      .populate({
+        path: 'payrollItems',
+        populate: {
+          path: 'employeeId',
+          select: 'firstName lastName employeeId payRate',
+        },
+      })
       .lean();
 
     if (!payrollRun) {

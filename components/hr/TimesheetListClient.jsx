@@ -28,6 +28,9 @@ import {
   Calendar,
   Download,
   Eye,
+  QrCode,
+  Edit,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -35,8 +38,12 @@ import Link from 'next/link';
  * Timesheet List Client Component
  * 
  * Displays list of timesheets with filters and actions
+ * 
+ * Props:
+ * - siteManagerMode: Boolean - If true, filter by assigned sites only
+ * - assignedSiteIds: Array - Array of site IDs for site manager filtering
  */
-export default function TimesheetListClient() {
+export default function TimesheetListClient({ siteManagerMode = false, assignedSiteIds = [] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,14 +61,27 @@ export default function TimesheetListClient() {
         url += `status=${statusFilter}&`;
       }
       if (weekFilter) {
-        url += `weekStartDate=${weekFilter}`;
+        url += `weekStartDate=${weekFilter}&`;
+      }
+      if (siteManagerMode && assignedSiteIds.length > 0) {
+        url += `siteIds=${assignedSiteIds.join(',')}`;
       }
 
       const response = await fetch(url);
       const result = await response.json();
 
       if (result.success) {
-        setTimesheets(result.data);
+        // If site manager mode, filter timesheets by site
+        let filteredTimesheets = result.data;
+        if (siteManagerMode && assignedSiteIds.length > 0) {
+          filteredTimesheets = result.data.filter(timesheet => {
+            // Check if any day in the timesheet has a siteId in assignedSiteIds
+            return timesheet.hours?.some(day => 
+              day.siteId && assignedSiteIds.includes(day.siteId.toString())
+            );
+          });
+        }
+        setTimesheets(filteredTimesheets);
       } else {
         setError(result.error?.message || 'Failed to load timesheets');
       }
@@ -140,6 +160,23 @@ export default function TimesheetListClient() {
       ),
     };
     return badges[status] || badges.draft;
+  };
+
+  const getSourceBadge = (source) => {
+    if (source === 'QR') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+          <QrCode className="h-3 w-3 mr-1" />
+          QR
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+        <Edit className="h-3 w-3 mr-1" />
+        Manual
+      </span>
+    );
   };
 
   const formatWeek = (weekStartDate) => {
@@ -261,6 +298,15 @@ export default function TimesheetListClient() {
                             <p className="font-semibold">{timesheet.totalHours}h</p>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {getSourceBadge(timesheet.source || 'QR')}
+                          {timesheet.missingOutEvents && timesheet.missingOutEvents.length > 0 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              {timesheet.missingOutEvents.length} Missing OUT
+                            </span>
+                          )}
+                        </div>
                         {timesheet.approvedBy && (
                           <div className="text-xs text-muted-foreground">
                             Approved by: {timesheet.approvedBy.firstName} {timesheet.approvedBy.lastName}
@@ -286,6 +332,7 @@ export default function TimesheetListClient() {
                       <TableHead>Employee</TableHead>
                       <TableHead>Week</TableHead>
                       <TableHead>Total Hours</TableHead>
+                      <TableHead>Source</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Approved By</TableHead>
                       <TableHead>Actions</TableHead>
@@ -306,6 +353,17 @@ export default function TimesheetListClient() {
                         </TableCell>
                         <TableCell>{formatWeek(timesheet.weekStartDate)}</TableCell>
                         <TableCell className="font-semibold">{timesheet.totalHours}h</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {getSourceBadge(timesheet.source || 'QR')}
+                            {timesheet.missingOutEvents && timesheet.missingOutEvents.length > 0 && (
+                              <span className="inline-flex items-center text-xs text-orange-600">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                {timesheet.missingOutEvents.length} Missing OUT
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{getStatusBadge(timesheet.status)}</TableCell>
                         <TableCell>
                           {timesheet.approvedBy
