@@ -5,15 +5,18 @@ import { connectDB } from '@/lib/db/mongodb';
 import { DailyLog } from '@/lib/models/DailyLog';
 import { Employee } from '@/lib/models/Employee';
 import { Site } from '@/lib/models/Site';
+import { Attendance } from '@/lib/models/Attendance';
 import DailyLogForm from '@/components/site-manager/DailyLogForm';
 import DailyLogView from '@/components/site-manager/DailyLogView';
 import SiteManagerLayout from '@/components/layouts/SiteManagerLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Building2 } from 'lucide-react';
+import { Building2, FileText, Users, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { serializeMongoose } from '@/lib/utils/serialize';
 import { checkModuleAccessServer } from '@/lib/utils/checkModuleAccessServer';
+import { canViewSection } from '@/lib/utils/dashboardPermissions';
+import StatsCard from '@/components/dashboard/StatsCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +53,17 @@ export default async function SiteManagerDashboard() {
   }
 
   await connectDB();
+
+  // Get user with role template for permission checks
+  const employee = await Employee.findById(session.user.id)
+    .populate('roleTemplateId', 'name permissions')
+    .lean();
+  
+  const user = {
+    role: session.user.role,
+    roleTemplateId: employee?.roleTemplateId || null,
+    purchasedModules: session.user.purchasedModules || [],
+  };
 
   // Get the Site Manager's assigned site
   // Site Managers have a siteId field in their employee record
@@ -119,71 +133,214 @@ export default async function SiteManagerDashboard() {
   const isLocked = todayLog?.status === 'locked';
   const isSent = todayLog?.status === 'sent';
 
+  // Fetch additional stats based on permissions
+  let dailyLogStats = null;
+  let attendanceStats = null;
+
+  // Daily Log stats (if user has process_management permission)
+  if (canViewSection(user, 'process_management', ['view', 'create'])) {
+    const totalLogs = await DailyLog.countDocuments({
+      siteId: siteManager.siteId,
+      siteManagerId: session.user.id,
+    });
+    const draftLogs = await DailyLog.countDocuments({
+      siteId: siteManager.siteId,
+      siteManagerId: session.user.id,
+      status: 'draft',
+    });
+    const sentLogs = await DailyLog.countDocuments({
+      siteId: siteManager.siteId,
+      siteManagerId: session.user.id,
+      status: 'sent',
+    });
+    dailyLogStats = {
+      total: totalLogs,
+      draft: draftLogs,
+      sent: sentLogs,
+    };
+  }
+
+  // Attendance stats (if user has attendance:view permission)
+  if (canViewSection(user, 'attendance', 'view')) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todayAttendance = await Attendance.countDocuments({
+      siteId: siteManager.siteId,
+      date: {
+        $gte: today,
+        $lt: tomorrow,
+      },
+    });
+    attendanceStats = {
+      today: todayAttendance,
+    };
+  }
+
   return (
     <SiteManagerLayout siteName={site.name}>
       <div className="space-y-6">
         {/* Page Header */}
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Daily Site Log</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {hasLog
-              ? isDraft
-                ? 'Complete your daily log for today'
-                : isLocked
-                ? 'Your log is locked and ready to send'
-                : 'Your log has been sent to Contracts Manager'
-              : 'Create your daily log for today'}
+            Welcome back, {session.user.name}
           </p>
         </div>
 
-        {/* Site Information Card */}
-        <Card>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Daily Logs Widget */}
+          {canViewSection(user, 'process_management', ['view', 'create']) && dailyLogStats && (
+            <StatsCard
+              title="Daily Logs"
+              description="Site daily logs"
+              icon="FileText"
+              iconColor="text-blue-500"
+              requiredPermission="process_management:view"
+            >
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className="text-lg font-semibold">{dailyLogStats.total}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Draft</span>
+                  <span className="text-lg font-semibold text-orange-600">{dailyLogStats.draft}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Sent</span>
+                  <span className="text-lg font-semibold text-green-600">{dailyLogStats.sent}</span>
+                </div>
+              </div>
+            </StatsCard>
+          )}
+
+          {/* Attendance Widget */}
+          {canViewSection(user, 'attendance', 'view') && attendanceStats && (
+            <StatsCard
+              title="Attendance"
+              description="Today's attendance"
+              icon="Users"
+              iconColor="text-green-500"
+              requiredPermission="attendance:view"
+            >
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Today</span>
+                  <span className="text-lg font-semibold">{attendanceStats.today}</span>
+                </div>
+                <Link href="/site-manager/attendance-verification" className="block mt-3">
+                  <Button variant="outline" className="w-full" size="sm">
+                    Verify Attendance
+                  </Button>
+                </Link>
+              </div>
+            </StatsCard>
+          )}
+        </div>
+
+        {/* Daily Log Section */}
+        {canViewSection(user, 'process_management', ['view', 'create']) && (
+          <div>
+            <h3 className="text-xl font-semibold mb-4">Daily Site Log</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {hasLog
+                ? isDraft
+                  ? 'Complete your daily log for today'
+                  : isLocked
+                  ? 'Your log is locked and ready to send'
+                  : 'Your log has been sent to Contracts Manager'
+                : 'Create your daily log for today'}
+            </p>
+
+            {/* Site Information Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Site Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Site Name</p>
+                    <p className="text-sm font-semibold">{site.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Site Code</p>
+                    <p className="text-sm font-semibold">{site.siteCode}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Address</p>
+                    <p className="text-sm">
+                      {site.address.street}, {site.address.city}, {site.address.postcode}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Date</p>
+                    <p className="text-sm font-semibold">{today.toLocaleDateString()}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Daily Log Form or View */}
+            {hasLog ? (
+              // Show form if draft, view if locked/sent
+              isDraft ? (
+                <DailyLogForm
+                  initialData={todayLog ? serializeMongoose(todayLog) : null}
+                  siteId={siteManager.siteId?.toString()}
+                  siteName={site.name}
+                />
+              ) : (
+                <DailyLogView dailyLog={todayLog ? serializeMongoose(todayLog) : null} />
+              )
+            ) : (
+              // Show create form if no log exists
+              <DailyLogForm siteId={siteManager.siteId?.toString()} siteName={site.name} />
+            )}
+          </div>
+        )}
+
+        {/* Quick Actions */}
+        <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Site Information
-            </CardTitle>
+            <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Site Name</p>
-                <p className="text-sm font-semibold">{site.name}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Site Code</p>
-                <p className="text-sm font-semibold">{site.siteCode}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Address</p>
-                <p className="text-sm">
-                  {site.address.street}, {site.address.city}, {site.address.postcode}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Date</p>
-                <p className="text-sm font-semibold">{today.toLocaleDateString()}</p>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {canViewSection(user, 'process_management', ['view', 'create']) && (
+                <Link href="/site-manager/daily-logs">
+                  <Button variant="outline" className="w-full h-auto py-3">
+                    <FileText className="h-4 w-4 mr-2" />
+                    View All Logs
+                  </Button>
+                </Link>
+              )}
+              {canViewSection(user, 'attendance', 'view') && (
+                <Link href="/site-manager/attendance-verification">
+                  <Button variant="outline" className="w-full h-auto py-3">
+                    <Users className="h-4 w-4 mr-2" />
+                    Verify Attendance
+                  </Button>
+                </Link>
+              )}
+              {canViewSection(user, 'process_management', 'create') && (
+                <Link href="/site-manager/variations">
+                  <Button variant="outline" className="w-full h-auto py-3">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Variations
+                  </Button>
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>
-
-        {/* Daily Log Form or View */}
-        {hasLog ? (
-          // Show form if draft, view if locked/sent
-          isDraft ? (
-            <DailyLogForm
-              initialData={todayLog ? serializeMongoose(todayLog) : null}
-              siteId={siteManager.siteId?.toString()}
-              siteName={site.name}
-            />
-          ) : (
-            <DailyLogView dailyLog={todayLog ? serializeMongoose(todayLog) : null} />
-          )
-        ) : (
-          // Show create form if no log exists
-          <DailyLogForm siteId={siteManager.siteId?.toString()} siteName={site.name} />
-        )}
       </div>
     </SiteManagerLayout>
   );

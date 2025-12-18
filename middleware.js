@@ -9,6 +9,13 @@ export default withAuth(
       return NextResponse.next();
     }
     
+    // For API routes, let them handle their own authentication
+    // getServerSession in API routes will check authentication
+    // Don't block here - let the API route handler decide
+    if (req.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.next();
+    }
+    
     // If user has token, allow access
     if (req.nextauth.token) {
       return NextResponse.next();
@@ -39,7 +46,12 @@ export default withAuth(
         if (req.nextUrl.pathname === '/login') {
           return true;
         }
-        // Require token for other paths
+        // For API routes, always return true to prevent redirects
+        // The middleware function will handle authentication and return 401 if needed
+        if (req.nextUrl.pathname.startsWith('/api/')) {
+          return true;
+        }
+        // Require token for other paths (pages)
         return !!token;
       },
     },

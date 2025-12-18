@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth/config';
+import { cookies } from 'next/headers';
 import { connectDB } from '@/lib/db/mongodb';
 import { Employee } from '@/lib/models/Employee';
 import { RoleTemplate } from '@/lib/models/RoleTemplate';
@@ -64,8 +66,12 @@ const createEmployeeSchema = z.object({
 // GET - List all employees
 export async function GET(req) {
   try {
+    // Get session - same pattern as other API routes
+    const session = await getServerSession(authOptions);
+    
     // Check permission using template - requires 'hrm' module with 'view' action
-    const permissionCheck = await checkPermission('hrm', 'view');
+    // Pass session to checkPermission
+    const permissionCheck = await checkPermission('hrm', 'view', session);
     if (permissionCheck.error) {
       return NextResponse.json(
         { success: false, error: permissionCheck.error },
@@ -115,8 +121,81 @@ export async function GET(req) {
 // POST - Create new employee
 export async function POST(req) {
   try {
+    // Try getServerSession first (works in some contexts)
+    let session = await getServerSession(authOptions);
+    
+    // If that doesn't work, try using getToken with cookies directly
+    if (!session?.user) {
+      try {
+        const cookieStore = await cookies();
+        const allCookies = cookieStore.getAll();
+        const sessionToken = cookieStore.get('next-auth.session-token') || 
+                            cookieStore.get('__Secure-next-auth.session-token');
+        
+        // Debug logging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[POST /api/v1/employees] getServerSession returned null');
+          console.log('[POST /api/v1/employees] Total cookies:', allCookies.length);
+          console.log('[POST /api/v1/employees] Session token found:', !!sessionToken);
+        }
+        
+        if (sessionToken) {
+          // Build cookie header string
+          const cookieHeader = allCookies
+            .map(c => `${c.name}=${c.value}`)
+            .join('; ');
+          
+          // Create a plain object for getToken (not Headers instance)
+          const mockReq = {
+            headers: {
+              get: (name) => {
+                if (name.toLowerCase() === 'cookie') {
+                  return cookieHeader;
+                }
+                return null;
+              },
+            },
+          };
+          
+          const token = await getToken({ 
+            req: mockReq,
+            secret: process.env.NEXTAUTH_SECRET,
+          });
+          
+          if (token) {
+            // Reconstruct session from token
+            session = {
+              user: {
+                id: token.id,
+                email: token.email,
+                name: token.name,
+                role: token.role,
+                employeeId: token.employeeId,
+                purchasedModules: token.purchasedModules || [],
+                roleTemplateId: token.roleTemplateId || null,
+              },
+            };
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[POST /api/v1/employees] Session reconstructed from token:', session.user.email);
+            }
+          }
+        }
+      } catch (tokenError) {
+        console.error('[POST /api/v1/employees] Error getting token:', tokenError);
+      }
+    }
+    
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
+        { status: 401 }
+      );
+    }
+    
     // Check permission using template - requires 'hrm' module with 'create' action
-    const permissionCheck = await checkPermission('hrm', 'create');
+    // Pass session to checkPermission
+    const permissionCheck = await checkPermission('hrm', 'create', session);
     if (permissionCheck.error) {
       return NextResponse.json(
         { success: false, error: permissionCheck.error },

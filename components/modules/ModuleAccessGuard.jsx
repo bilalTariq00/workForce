@@ -64,7 +64,15 @@ export default function ModuleAccessGuard({
                 Browse Modules
               </Button>
               <Button 
-                onClick={() => router.push('/modules-dashboard')} 
+                onClick={() => {
+                  // Only admin goes to modules-dashboard, all other roles go to /dashboard
+                  const userRole = session?.user?.role;
+                  if (userRole === 'admin') {
+                    router.push('/modules-dashboard');
+                  } else {
+                    router.push('/dashboard');
+                  }
+                }} 
                 variant="outline"
                 className="flex-1"
               >

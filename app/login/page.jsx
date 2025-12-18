@@ -59,27 +59,32 @@ export default function LoginPage() {
         const action = searchParams.get('action');
         const module = searchParams.get('module');
         
-        let targetPath = '/dashboard'; // Default redirect - dashboard will handle role-based routing
+        // Determine target path
+        let targetPath = '/dashboard'; // Default - will route to role-specific dashboard
         
-        // Decode callbackUrl if it's URL encoded
-        const decodedCallback = callbackUrl ? decodeURIComponent(callbackUrl) : null;
-        
-        // Only use callbackUrl if it's a specific route (not /dashboard)
-        // Otherwise, redirect to /dashboard which will route to role-specific dashboard
-        if (decodedCallback && decodedCallback !== '/login' && decodedCallback !== '/dashboard') {
-          targetPath = decodedCallback;
-        } else if (callbackUrl === '/modules' && action === 'buy' && module) {
+        // Handle special cases
+        if (callbackUrl === '/modules' && action === 'buy' && module) {
           targetPath = `/modules?buy=${module}`;
         } else if (callbackUrl === '/modules') {
           targetPath = '/modules';
-        } else if (callbackUrl && callbackUrl !== '/login' && callbackUrl !== '/dashboard') {
-          targetPath = callbackUrl;
+        } else if (callbackUrl && callbackUrl !== '/login' && callbackUrl !== '/dashboard' && !callbackUrl.startsWith('/api/')) {
+          // Only use callbackUrl if it's a valid page route (not API routes)
+          try {
+            const decodedCallback = decodeURIComponent(callbackUrl);
+            if (decodedCallback !== '/login' && decodedCallback !== '/dashboard') {
+              targetPath = decodedCallback;
+            }
+          } catch (e) {
+            // If decoding fails, use default
+            console.warn('Failed to decode callbackUrl:', e);
+          }
         }
         
-        // Small delay to ensure cookie is set, then redirect
+        // Wait for session cookie to be set, then redirect
+        // Use window.location.href for a full page reload to ensure session is loaded
         setTimeout(() => {
           window.location.href = targetPath;
-        }, 100);
+        }, 300);
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

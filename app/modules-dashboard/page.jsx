@@ -16,6 +16,13 @@ export default async function ModulesDashboardPage() {
     redirect('/login');
   }
 
+  // Only admin can access modules-dashboard
+  // All other roles should be redirected to their role-specific dashboard
+  if (session.user.role !== 'admin') {
+    const { getRoleDashboard } = await import('@/lib/utils/roleDashboard');
+    redirect(getRoleDashboard(session.user.role));
+  }
+
   await connectDB();
   
   const employee = await Employee.findById(session.user.id);

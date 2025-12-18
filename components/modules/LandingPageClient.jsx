@@ -39,6 +39,16 @@ export default function LandingPageClient({
   // Ensure modules is an array
   const modulesList = Array.isArray(modules) ? modules : [];
 
+  // Helper function to get the correct dashboard route based on role
+  const getDashboardRoute = () => {
+    const userRole = session?.user?.role || user?.role;
+    if (userRole === 'admin') {
+      return '/modules-dashboard';
+    }
+    // For all other roles, redirect to /dashboard which handles role-based routing server-side
+    return '/dashboard';
+  };
+
   const handlePurchase = async (moduleCodes, isBuyAll = false) => {
     // If not authenticated, redirect to login
     if (!isAuthenticated || !session) {
@@ -65,9 +75,17 @@ export default function LandingPageClient({
       setMessage({ type: 'success', text: data.message || 'Modules purchased successfully!' });
       
       // Refresh and redirect after a short delay
+      // Only admin goes to modules-dashboard, all other roles go to their role-specific dashboard
       setTimeout(() => {
         router.refresh();
-        router.push('/modules-dashboard');
+        // Get role from session to determine redirect
+        const userRole = session?.user?.role;
+        if (userRole === 'admin') {
+          router.push('/modules-dashboard');
+        } else {
+          // Redirect to /dashboard which will handle role-based routing server-side
+          router.push('/dashboard');
+        }
       }, 1500);
     } catch (error) {
       setMessage({ type: 'error', text: error.message || 'Failed to purchase modules' });
@@ -121,7 +139,7 @@ export default function LandingPageClient({
                   </div>
                 </div>
                 <Button 
-                  onClick={() => router.push('/modules-dashboard')}
+                  onClick={() => router.push(getDashboardRoute())}
                   variant="outline"
                   size="lg"
                   className="gap-2"
@@ -225,7 +243,7 @@ export default function LandingPageClient({
               {isAuthenticated && (
                 <Button 
                   variant="outline"
-                  onClick={() => router.push('/modules-dashboard')}
+                  onClick={() => router.push(getDashboardRoute())}
                   className="gap-2"
                 >
                   View My Modules

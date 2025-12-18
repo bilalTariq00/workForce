@@ -228,6 +228,7 @@ export default function CreateEmployeeForm() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Ensure cookies are sent with the request
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -253,6 +254,24 @@ export default function CreateEmployeeForm() {
           payroll: payrollData,
         }),
       });
+
+      // Check if we got a 401 - session expired
+      if (response.status === 401) {
+        setError('Your session has expired. Please log in again.');
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+        setLoading(false);
+        return;
+      }
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
+      }
 
       const result = await response.json();
 
@@ -286,7 +305,17 @@ export default function CreateEmployeeForm() {
         setError(result.error?.message || 'Failed to create employee');
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      console.error('Error creating employee:', err);
+      
+      // Handle specific error cases
+      if (err.message?.includes('401') || err.message?.includes('UNAUTHORIZED') || err.message?.includes('Not authenticated')) {
+        setError('Your session has expired. Please log in again.');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } else {
+        setError(err.message || 'An error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

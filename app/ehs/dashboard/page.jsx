@@ -13,6 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AlertTriangle, ClipboardCheck, GraduationCap, TrendingUp, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { canViewSection } from '@/lib/utils/dashboardPermissions';
+import StatsCard from '@/components/dashboard/StatsCard';
+import QuickActionCard from '@/components/dashboard/QuickActionCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +44,17 @@ export default async function EHSDashboard() {
     }
 
     await connectDB();
+
+    // Get user with role template for permission checks
+    const employee = await Employee.findById(session.user.id)
+      .populate('roleTemplateId', 'name permissions')
+      .lean();
+    
+    const user = {
+      role: session.user.role,
+      roleTemplateId: employee?.roleTemplateId || null,
+      purchasedModules: session.user.purchasedModules || [],
+    };
 
     // Ensure models are registered (imports ensure this, but explicit check helps)
     if (!Site || !Employee || !Incident || !Inspection || !TrainingRegister) {
@@ -155,16 +169,15 @@ export default async function EHSDashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {/* Incidents Card */}
-          <Card>
-            <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-                Incidents
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Safety incidents & near-misses</CardDescription>
-            </CardHeader>
-            <CardContent>
+          {/* Incidents Card - Only show if user has certifications:view (EHS officers have this) */}
+          {canViewSection(user, 'certifications', 'view') && (
+            <StatsCard
+              title="Incidents"
+              description="Safety incidents & near-misses"
+              icon="AlertTriangle"
+              iconColor="text-red-500"
+              requiredPermission="certifications:view"
+            >
               <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs sm:text-sm text-muted-foreground">Total</span>
@@ -188,19 +201,18 @@ export default async function EHSDashboard() {
                   </Button>
                 </Link>
               </div>
-            </CardContent>
-          </Card>
+            </StatsCard>
+          )}
 
-          {/* Inspections Card */}
-          <Card>
-            <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
-                Inspections
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Site inspections & issues</CardDescription>
-            </CardHeader>
-            <CardContent>
+          {/* Inspections Card - Only show if user has certifications:view */}
+          {canViewSection(user, 'certifications', 'view') && (
+            <StatsCard
+              title="Inspections"
+              description="Site inspections & issues"
+              icon="ClipboardCheck"
+              iconColor="text-blue-500"
+              requiredPermission="certifications:view"
+            >
               <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs sm:text-sm text-muted-foreground">Total</span>
@@ -220,19 +232,18 @@ export default async function EHSDashboard() {
                   </Button>
                 </Link>
               </div>
-            </CardContent>
-          </Card>
+            </StatsCard>
+          )}
 
-          {/* Training Card */}
-          <Card>
-            <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
-                Training
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Training register & compliance</CardDescription>
-            </CardHeader>
-            <CardContent>
+          {/* Training Card - Only show if user has certifications:view */}
+          {canViewSection(user, 'certifications', 'view') && (
+            <StatsCard
+              title="Training"
+              description="Training register & compliance"
+              icon="GraduationCap"
+              iconColor="text-purple-500"
+              requiredPermission="certifications:view"
+            >
               <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs sm:text-sm text-muted-foreground">Total</span>
@@ -252,72 +263,70 @@ export default async function EHSDashboard() {
                   </Button>
                 </Link>
               </div>
-            </CardContent>
-          </Card>
+            </StatsCard>
+          )}
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <Card>
-            <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="text-base sm:text-lg">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-3">
-              <Link href="/ehs/incidents">
-                <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation" variant="outline">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Review Incidents
-                </Button>
-              </Link>
-              <Link href="/ehs/inspections">
-                <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation" variant="outline">
-                  <ClipboardCheck className="h-4 w-4 mr-2" />
-                  New Inspection
-                </Button>
-              </Link>
-              <Link href="/ehs/training">
-                <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation" variant="outline">
-                  <GraduationCap className="h-4 w-4 mr-2" />
-                  Assign Training
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+        {canViewSection(user, 'certifications', 'view') && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <QuickActionCard
+              title="Review Incidents"
+              description="Review and investigate safety incidents"
+              href="/ehs/incidents"
+              icon="AlertTriangle"
+              requiredPermission="certifications:view"
+            />
+            <QuickActionCard
+              title="New Inspection"
+              description="Create a new site inspection"
+              href="/ehs/inspections"
+              icon="ClipboardCheck"
+              requiredPermission="certifications:view"
+            />
+            <QuickActionCard
+              title="Assign Training"
+              description="Assign training to employees"
+              href="/ehs/training"
+              icon="GraduationCap"
+              requiredPermission="certifications:view"
+            />
 
-          {/* Alerts Card */}
-          {(criticalIncidents > 0 || overdueTraining > 0 || openIssuesCount > 0) && (
-            <Card className="border-orange-200 dark:border-orange-800">
-              <CardHeader className="pb-3 sm:pb-6">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-orange-600">
-                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                  Requires Attention
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-xs sm:text-sm">
-                  {criticalIncidents > 0 && (
-                    <div className="flex items-center gap-2 text-red-600">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{criticalIncidents} critical incident(s)</span>
-                    </div>
-                  )}
-                  {overdueTraining > 0 && (
-                    <div className="flex items-center gap-2 text-orange-600">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{overdueTraining} overdue training(s)</span>
-                    </div>
-                  )}
-                  {openIssuesCount > 0 && (
-                    <div className="flex items-center gap-2 text-orange-600">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{openIssuesCount} open inspection issue(s)</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+            {/* Alerts Card */}
+            {canViewSection(user, 'certifications', 'view') && (criticalIncidents > 0 || overdueTraining > 0 || openIssuesCount > 0) && (
+              <Card className="border-orange-200 dark:border-orange-800 col-span-1 sm:col-span-2 lg:col-span-3">
+                <CardHeader className="pb-3 sm:pb-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-orange-600">
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Requires Attention
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-xs sm:text-sm">
+                    {criticalIncidents > 0 && (
+                      <div className="flex items-center gap-2 text-red-600">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{criticalIncidents} critical incident(s)</span>
+                      </div>
+                    )}
+                    {overdueTraining > 0 && (
+                      <div className="flex items-center gap-2 text-orange-600">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{overdueTraining} overdue training(s)</span>
+                      </div>
+                    )}
+                    {openIssuesCount > 0 && (
+                      <div className="flex items-center gap-2 text-orange-600">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{openIssuesCount} open inspection issue(s)</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
     </EHSLayout>
   );

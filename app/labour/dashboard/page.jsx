@@ -5,12 +5,16 @@ import { connectDB } from '@/lib/db/mongodb';
 import { Attendance } from '@/lib/models/Attendance';
 import { Employee } from '@/lib/models/Employee';
 import { Site } from '@/lib/models/Site';
+import { LeaveRequest } from '@/lib/models/LeaveRequest';
+import { EmployeeCertificate } from '@/lib/models/EmployeeCertificate';
 import LabourLayout from '@/components/layouts/LabourLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, MapPin, CheckCircle2, FileText, ExternalLink, Award } from 'lucide-react';
 import Link from 'next/link';
 import { serializeMongoose } from '@/lib/utils/serialize';
+import { canViewSection } from '@/lib/utils/dashboardPermissions';
+import StatsCard from '@/components/dashboard/StatsCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +42,24 @@ export default async function LabourDashboard() {
   } catch (error) {
     console.error('[LABOUR DASHBOARD] Database connection error:', error);
     // Don't redirect on DB error, show error message instead
+  }
+
+  // Get user with role template for permission checks
+  let user = null;
+  if (dbConnected) {
+    try {
+      const employee = await Employee.findById(session.user.id)
+        .populate('roleTemplateId', 'name permissions')
+        .lean();
+      
+      user = {
+        role: session.user.role,
+        roleTemplateId: employee?.roleTemplateId || null,
+        purchasedModules: session.user.purchasedModules || [],
+      };
+    } catch (error) {
+      console.error('[LABOUR DASHBOARD] Error fetching user permissions:', error);
+    }
   }
 
   // Get employee details
@@ -138,44 +160,91 @@ export default async function LabourDashboard() {
     );
   }
 
-  // Get today's attendance
+  // Get today's attendance (if user has attendance:view permission)
   let attendance = null;
   let recentAttendance = [];
+  let leaveStats = null;
+  let certificationStats = null;
   
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+  if (user && canViewSection(user, 'attendance', 'view')) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
-    attendance = await Attendance.findOne({
-      employeeId: session.user.id,
-      date: {
-        $gte: today,
-        $lt: tomorrow,
-      },
-    })
-      .populate('siteId', 'name siteCode')
-      .lean();
+      attendance = await Attendance.findOne({
+        employeeId: session.user.id,
+        date: {
+          $gte: today,
+          $lt: tomorrow,
+        },
+      })
+        .populate('siteId', 'name siteCode')
+        .lean();
 
-    // Get recent attendance (last 7 days)
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      // Get recent attendance (last 7 days)
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    recentAttendance = await Attendance.find({
-      employeeId: session.user.id,
-      date: {
-        $gte: sevenDaysAgo,
-        $lt: tomorrow,
-      },
-    })
-      .populate('siteId', 'name siteCode')
-      .sort({ date: -1 })
-      .limit(7)
-      .lean();
-  } catch (error) {
-    console.error('Error fetching attendance:', error);
-    // Continue with null/empty arrays
+      recentAttendance = await Attendance.find({
+        employeeId: session.user.id,
+        date: {
+          $gte: sevenDaysAgo,
+          $lt: tomorrow,
+        },
+      })
+        .populate('siteId', 'name siteCode')
+        .sort({ date: -1 })
+        .limit(7)
+        .lean();
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+      // Continue with null/empty arrays
+    }
+  }
+
+  // Get leave stats (if user has leave_requests:view permission)
+  if (user && canViewSection(user, 'leave_requests', 'view')) {
+    try {
+      const pendingLeaves = await LeaveRequest.countDocuments({
+        employeeId: session.user.id,
+        status: 'pending',
+      });
+      const approvedLeaves = await LeaveRequest.countDocuments({
+        employeeId: session.user.id,
+        status: 'approved',
+      });
+      leaveStats = {
+        pending: pendingLeaves,
+        approved: approvedLeaves,
+      };
+    } catch (error) {
+      console.error('Error fetching leave stats:', error);
+    }
+  }
+
+  // Get certification stats (if user has certifications:view permission)
+  if (user && canViewSection(user, 'certifications', 'view')) {
+    try {
+      const totalCertifications = await EmployeeCertificate.countDocuments({
+        employeeId: session.user.id,
+      });
+      const expiringSoon = await EmployeeCertificate.countDocuments({
+        employeeId: session.user.id,
+        expiryDate: {
+          $gte: new Date(),
+          $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        },
+        status: 'approved',
+      });
+      certificationStats = {
+        total: totalCertifications,
+        expiringSoon: expiringSoon,
+      };
+    } catch (error) {
+      console.error('Error fetching certification stats:', error);
+    }
   }
 
   // Serialize all Mongoose objects using JSON.parse/stringify (safer for Next.js)
@@ -227,16 +296,74 @@ export default async function LabourDashboard() {
           </p>
         </div>
 
-        {/* Today's Attendance Card */}
-        <Card>
-          <CardHeader className="pb-3 sm:pb-6">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
-              Today's Attendance
-            </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Your attendance status for today</CardDescription>
-          </CardHeader>
-          <CardContent>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Leave Requests Widget */}
+          {user && canViewSection(user, 'leave_requests', 'view') && leaveStats && (
+            <StatsCard
+              title="Leave Requests"
+              description="Your leave requests"
+              icon="Calendar"
+              iconColor="text-blue-500"
+              requiredPermission="leave_requests:view"
+            >
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Pending</span>
+                  <span className="text-lg font-semibold text-orange-600">{leaveStats.pending}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Approved</span>
+                  <span className="text-lg font-semibold text-green-600">{leaveStats.approved}</span>
+                </div>
+                <Link href="/attendance/leave-request" className="block mt-3">
+                  <Button variant="outline" className="w-full" size="sm">
+                    Request Leave
+                  </Button>
+                </Link>
+              </div>
+            </StatsCard>
+          )}
+
+          {/* Certifications Widget */}
+          {user && canViewSection(user, 'certifications', 'view') && certificationStats && (
+            <StatsCard
+              title="Certifications"
+              description="Your certifications"
+              icon="Award"
+              iconColor="text-amber-500"
+              requiredPermission="certifications:view"
+            >
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className="text-lg font-semibold">{certificationStats.total}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Expiring Soon</span>
+                  <span className="text-lg font-semibold text-red-600">{certificationStats.expiringSoon}</span>
+                </div>
+                <Link href="/attendance/certifications" className="block mt-3">
+                  <Button variant="outline" className="w-full" size="sm">
+                    Manage Certifications
+                  </Button>
+                </Link>
+              </div>
+            </StatsCard>
+          )}
+        </div>
+
+        {/* Today's Attendance Card - Only show if user has attendance:view permission */}
+        {user && canViewSection(user, 'attendance', 'view') && (
+          <Card>
+            <CardHeader className="pb-3 sm:pb-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                Today's Attendance
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Your attendance status for today</CardDescription>
+            </CardHeader>
+            <CardContent>
             {serializedAttendance ? (
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center gap-2 text-green-600">
@@ -280,48 +407,53 @@ export default async function LabourDashboard() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <Card>
-            <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-                Leave Request
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Request time off or leave</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 sm:space-y-3">
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Annual Leave Balance: <span className="font-semibold">{Number(serializedEmployee?.annualLeaveBalance) || 0} days</span>
-                </p>
-                <Link href="/attendance/leave-request">
-                  <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation">Request Leave</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+          {user && canViewSection(user, 'leave_requests', 'view') && (
+            <Card>
+              <CardHeader className="pb-3 sm:pb-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Leave Request
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Request time off or leave</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 sm:space-y-3">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Annual Leave Balance: <span className="font-semibold">{Number(serializedEmployee?.annualLeaveBalance) || 0} days</span>
+                  </p>
+                  <Link href="/attendance/leave-request">
+                    <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation">Request Leave</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card>
-            <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Award className="h-4 w-4 sm:h-5 sm:w-5" />
-                Certifications
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Upload and manage your certifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 sm:space-y-3">
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  SafePass, CSCS, First Aid, etc.
-                </p>
-                <Link href="/attendance/certifications">
-                  <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation" variant="outline">Manage Certifications</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+          {user && canViewSection(user, 'certifications', 'view') && (
+            <Card>
+              <CardHeader className="pb-3 sm:pb-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Award className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Certifications
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Upload and manage your certifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 sm:space-y-3">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    SafePass, CSCS, First Aid, etc.
+                  </p>
+                  <Link href="/attendance/certifications">
+                    <Button className="w-full py-2.5 sm:py-2 text-sm sm:text-base touch-manipulation" variant="outline">Manage Certifications</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-3 sm:pb-6">
@@ -353,8 +485,8 @@ export default async function LabourDashboard() {
           </Card>
         </div>
 
-        {/* Recent Attendance */}
-        {serializedRecentAttendance.length > 0 && (
+        {/* Recent Attendance - Only show if user has attendance:view permission */}
+        {user && canViewSection(user, 'attendance', 'view') && serializedRecentAttendance.length > 0 && (
           <Card>
             <CardHeader className="pb-3 sm:pb-6">
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
